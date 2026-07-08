@@ -49,7 +49,7 @@ def _capex_adj(r):
 
 def _ev_ebitda(r):
     v = r["derived"].get("ev_ebitda")
-    return "n/a (EBITDA not positive)" if v is None else f"{v}x"
+    return "n/a (needs positive EBITDA and known net debt)" if v is None else f"{v}x"
 
 
 # A KPI the income/cash/balance statements don't contain — definition only.
@@ -176,7 +176,7 @@ def main(argv: list[str]) -> int:
         f = get_fundamentals_or_fixture(ticker)
     report = build_framework(name, f, as_json="--json" in flags)
     print(json.dumps(report, indent=2) if "--json" in flags else report)
-    return 0
+    return 0 if f.available else 1  # surface unavailable/missing-fixture to callers
 
 
 if __name__ == "__main__":

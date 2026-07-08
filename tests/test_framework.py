@@ -1,3 +1,5 @@
+import contextlib
+import io
 import sys
 import unittest
 from pathlib import Path
@@ -6,6 +8,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import framework
 from data import load_fixture
+
+
+def _exit_code(argv):
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        return framework.main(argv)
 
 
 class TestFramework(unittest.TestCase):
@@ -37,6 +44,11 @@ class TestFramework(unittest.TestCase):
         for name in framework.FRAMEWORKS:
             text = framework.build_framework(name, load_fixture("NBIS"), as_json=False)
             self.assertIn("framework", text)
+
+    def test_exit_code_signals_availability(self):
+        self.assertEqual(_exit_code(["saas", "CRWV", "--fixture"]), 0)   # fixture exists
+        self.assertEqual(_exit_code(["saas", "ZZZZ", "--fixture"]), 1)   # no fixture → unavailable
+        self.assertEqual(_exit_code(["bogus", "CRWV"]), 2)              # unknown framework
 
 
 if __name__ == "__main__":

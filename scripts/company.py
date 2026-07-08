@@ -112,8 +112,7 @@ def _story(r: dict) -> list[tuple[str, list[str]]]:
     elif "dcf_note" in r:
         val.append(f"DCF: {r['dcf_note']}")
     if d.get("ev_ebitda") is not None:
-        note = " (net debt unknown, so EV ≈ market cap)" if d["net_debt"] is None else ""
-        val.append(f"EV/EBITDA: {d['ev_ebitda']}x{note}.")
+        val.append(f"EV/EBITDA: {d['ev_ebitda']}x.")
     sections.append(("Valuation", val))
 
     # 8. Risks — pull the honest negatives together, including data gaps.
@@ -206,7 +205,7 @@ def main(argv: list[str]) -> int:
         f = get_fundamentals_or_fixture(ticker)
     report = build_company(f, as_json="--json" in flags)
     print(json.dumps(report, indent=2) if "--json" in flags else report)
-    return 0
+    return 0 if f.available else 1  # surface unavailable/missing-fixture to callers
 
 
 if __name__ == "__main__":

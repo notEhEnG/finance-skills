@@ -1,3 +1,5 @@
+import contextlib
+import io
 import sys
 import unittest
 from pathlib import Path
@@ -6,6 +8,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import company
 from data import Fundamentals, load_fixture
+
+
+def _exit_code(argv):
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        return company.main(argv)
 
 # The nine sequential stages the walkthrough must always present, in order.
 EXPECTED_ORDER = [
@@ -49,6 +56,10 @@ class TestCompany(unittest.TestCase):
         f = Fundamentals(ticker="ZZZZ", available=False, error="network down")
         text = company.build_company(f, as_json=False)
         self.assertIn("unavailable", text.lower())
+
+    def test_exit_code_signals_availability(self):
+        self.assertEqual(_exit_code(["CRWV", "--fixture"]), 0)   # fixture exists
+        self.assertEqual(_exit_code(["ZZZZ", "--fixture"]), 1)   # no fixture → unavailable
 
 
 if __name__ == "__main__":

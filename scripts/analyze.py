@@ -238,7 +238,7 @@ def main(argv: list[str]) -> int:
 
     report = build_report(f, as_json="--json" in flags)
     print(json.dumps(report, indent=2) if "--json" in flags else report)
-    return 0 if (isinstance(report, str) or report.get("available", True)) else 1
+    return 0 if f.available else 1  # non-zero on unavailable data, in text and json alike
 
 
 if __name__ == "__main__":

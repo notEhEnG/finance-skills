@@ -88,6 +88,20 @@ class TestHealth(unittest.TestCase):
         self.assertEqual(res["strength"], "strong")
 
 
+class TestEvEbitda(unittest.TestCase):
+    def test_computes_with_known_net_debt(self):
+        # EV = 48B market cap + 11.5B net debt = 59.5B; / 1.064B EBITDA ≈ 55.9x.
+        self.assertEqual(metrics.ev_ebitda(48e9, 11.5e9, 1.064e9), 55.9)
+
+    def test_none_when_net_debt_unknown(self):
+        # Fail closed — do not impute 0 and fabricate a concrete multiple.
+        self.assertIsNone(metrics.ev_ebitda(48e9, None, 1.064e9))
+
+    def test_none_when_ebitda_not_positive(self):
+        self.assertIsNone(metrics.ev_ebitda(48e9, 1e9, 0))
+        self.assertIsNone(metrics.ev_ebitda(48e9, 1e9, -5e8))
+
+
 class TestGuards(unittest.TestCase):
     def test_safe_margin_divzero_and_none(self):
         self.assertIsNone(metrics.safe_margin(10, 0))
