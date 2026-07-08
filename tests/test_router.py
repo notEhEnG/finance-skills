@@ -67,6 +67,21 @@ class TestTickerExtraction(unittest.TestCase):
     def test_multiple_tickers_first_seen_order(self):
         self.assertEqual(router.extract_tickers("compare AMD and NVDA"), ["AMD", "NVDA"])
 
+    def test_class_share_symbols(self):
+        self.assertEqual(router.extract_tickers("is BRK.B cheap"), ["BRK.B"])
+        self.assertEqual(router.extract_tickers("thoughts on $rds.a"), ["RDS.A"])
+
+    def test_dotted_abbreviations_are_not_tickers(self):
+        # "U.S." and "U.K." must not be mistaken for class-share symbols.
+        self.assertEqual(router.extract_tickers("is the U.S. market a buy"), [])
+
+
+class TestDeterminism(unittest.TestCase):
+    def test_fuzzy_is_stable_across_calls(self):
+        # Sorted pools mean a tie-prone typo resolves identically every time.
+        results = {router.resolve("valuaton").command for _ in range(20)}
+        self.assertEqual(len(results), 1)
+
 
 class TestHelp(unittest.TestCase):
     def test_help_groups_by_question(self):

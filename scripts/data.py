@@ -58,9 +58,13 @@ class Fundamentals:
 
     @property
     def net_debt(self) -> float | None:
-        if self.total_debt is None and self.total_cash is None:
+        """Total debt minus cash, or None unless BOTH sides are known. A missing
+        side must not be imputed as 0 — that fabricates a concrete leverage figure
+        (and a DCF net-debt input) from incomplete data. `_num` maps genuinely
+        missing fields to None, so a real reported 0.0 still computes."""
+        if self.total_debt is None or self.total_cash is None:
             return None
-        return (self.total_debt or 0.0) - (self.total_cash or 0.0)
+        return self.total_debt - self.total_cash
 
 
 def _now_iso() -> str:

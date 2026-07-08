@@ -84,7 +84,10 @@ def resolve(raw: str, fuzzy_cutoff: float = 0.72) -> Resolution:
         return Resolution(raw, ALIASES[token], "alias", [])
 
     # Fuzzy: match against canonical commands AND alias keys, then canonicalize.
-    pool = list(CANONICAL) + list(ALIASES.keys())
+    # Sort the pools: CANONICAL is a set, so its iteration order varies per run —
+    # unsorted, tied similarities would resolve the same typo differently across
+    # runs. Sorting makes routing deterministic.
+    pool = sorted(CANONICAL) + sorted(ALIASES.keys())
     close = get_close_matches(token, pool, n=3, cutoff=fuzzy_cutoff)
     if close:
         best = _canonicalize(close[0])
@@ -96,7 +99,7 @@ def resolve(raw: str, fuzzy_cutoff: float = 0.72) -> Resolution:
         return Resolution(raw, best, "fuzzy", suggestions)
 
     # Nothing close enough — offer best-effort hints, don't error out.
-    hints = get_close_matches(token, list(CANONICAL), n=3, cutoff=0.4)
+    hints = get_close_matches(token, sorted(CANONICAL), n=3, cutoff=0.4)
     return Resolution(raw, None, "unknown", hints or TOP_VERBS.copy())
 
 
@@ -121,8 +124,11 @@ _TICKER_STOPWORDS = {
     "Q1", "Q2", "Q3", "Q4", "YOLO", "OK", "VS", "AND", "THE", "FOR", "BUY",
 }
 
-_EXPLICIT_TICKER_RE = re.compile(r"\$([A-Za-z]{1,5})\b")
-_BARE_UPPER_RE = re.compile(r"\b([A-Z]{1,5})\b")
+# Symbols may carry a class/exchange suffix (BRK.B, RDS.A). For the bare-uppercase
+# scan the base must be >=2 letters before a dot, so ordinary abbreviations like
+# "U.S." don't read as tickers (their single-letter parts are length-filtered).
+_EXPLICIT_TICKER_RE = re.compile(r"\$([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)\b")
+_BARE_UPPER_RE = re.compile(r"\b([A-Z]{2,5}\.[A-Z]{1,2}|[A-Z]{1,5})\b")
 
 
 def extract_tickers(text: str) -> list[str]:

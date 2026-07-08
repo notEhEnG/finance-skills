@@ -18,6 +18,23 @@ class TestOrderingNoPandas(unittest.TestCase):
         self.assertIsNone(data._order_latest_first(None))
 
 
+class TestNetDebt(unittest.TestCase):
+    def _f(self, debt, cash):
+        return data.Fundamentals(ticker="X", available=True, total_debt=debt, total_cash=cash)
+
+    def test_none_when_either_side_missing(self):
+        self.assertIsNone(self._f(1_000.0, None).net_debt)   # cash unknown
+        self.assertIsNone(self._f(None, 500.0).net_debt)     # debt unknown
+        self.assertIsNone(self._f(None, None).net_debt)
+
+    def test_computes_when_both_known(self):
+        self.assertEqual(self._f(1_000.0, 400.0).net_debt, 600.0)
+
+    def test_real_zero_is_not_treated_as_missing(self):
+        # A genuine reported 0.0 (net cash position) must still compute, not None.
+        self.assertEqual(self._f(0.0, 750.0).net_debt, -750.0)
+
+
 @unittest.skipUnless(HAVE_PANDAS, "pandas not installed")
 class TestStatementOrdering(unittest.TestCase):
     def _ascending_stmt(self):
