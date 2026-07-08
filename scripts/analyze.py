@@ -90,7 +90,9 @@ def build_report(f: Fundamentals, as_json: bool = False):
             "capex_intensity_pct": capex_intensity,
             "share_dilution_pct": share_dilution,
             "net_debt": f.net_debt,
+            "enterprise_value": metrics.enterprise_value(f.market_cap, f.net_debt),
             "ev_ebitda": metrics.ev_ebitda(f.market_cap, f.net_debt, f.ebitda),
+            "ev_sales": metrics.ev_sales(f.market_cap, f.net_debt, f.revenue),
         },
     }
 

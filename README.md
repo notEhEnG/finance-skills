@@ -141,6 +141,32 @@ Price: $100   Market cap: $48.00B
     Not a recommendation — verify against primary filings before acting.
 ```
 
+### `valuation` — "is it cheap?" as a table
+
+`/finance-skills valuation <ticker>` lays the valuation slice out as a scannable
+**Metric | Value | Read** table (DCF, EV/Sales, EV/EBITDA, Rule 40), flagging a
+distorted EV/EBITDA when EBITDA margin exceeds 100%:
+
+```text
+═══ CoreWeave, Inc. (CRWV) — valuation ═══
+Source: fixture · as of 2026-Q1  [SAMPLE DATA — not live]
+
+  Metric              Value        Read
+  ───────────────────────────────────────────────────────────────────
+  Price               $100         —
+  Market cap          $48.00B      —
+  Enterprise value    $59.50B      market cap + net debt
+  EV / Sales          31.3x        extreme — priced on growth, not sales
+  EV / EBITDA         55.9x        expensive
+  DCF / share         n/a          FCF negative — DCF skipped
+  Rule of 40          -668 vs 38   BELOW BAR (ai neocloud)
+  Revenue growth      111.1%       hypergrowth
+  FCF margin          -315.8%      cash burn — depends on funding
+  Net debt / EBITDA   10.81x       elevated — watch refinancing
+
+Verdict: No DCF (FCF not positive), so it can't be anchored to intrinsic value — expensive on EV/Sales 31.3x; a growth/backlog bet, not supported by current cash flows.
+```
+
 ### `framework` — run a whole lens at once (honest about data)
 
 `/finance-skills framework saas CRWV` runs every SaaS metric instead of making
@@ -155,17 +181,21 @@ _**needs disclosed KPI**_ rather than fabricated.
 ═══ CoreWeave, Inc. (CRWV) — SaaS / software quality framework ═══
 Source: fixture · as of 2026-Q1  [SAMPLE DATA — not live]
 
-  Rule of 40                   :  judged -668 vs 38 bar → BELOW BAR (EBITDA 167 / FCF -205, gap 372)
-  Gross margin                 :  70.0%
-  FCF margin                   :  -315.8%
-  Revenue growth (YoY)         :  111.1%
-  EV/EBITDA                    :  55.9x
-  Magic Number                 ·  needs disclosed KPI
-                                  ↳ net-new ARR ÷ prior-quarter S&M spend; >0.75 = efficient growth. Needs S&M + ARR disclosure.
-  CAC payback                  ·  needs disclosed KPI
-                                  ↳ months of gross-margin-adjusted revenue to recover customer acquisition cost. Needs S&M + new-customer/ARR disclosure.
-  Net revenue retention (NRR)  ·  needs disclosed KPI
-                                  ↳ expansion − churn on existing customers; >120% is elite. A disclosed KPI, not in the financial statements.
+  Metric                        Value / status
+  ───────────────────────────────────────────────────────────────────
+  Rule of 40                    judged -668 vs 38 bar → BELOW BAR (EBITDA 167 / FCF -205, gap 372)
+  Gross margin                  70.0%
+  FCF margin                    -315.8%
+  Revenue growth (YoY)          111.1%
+  EV/EBITDA                     55.9x
+  Magic Number                  ⚠ needs disclosed KPI
+  CAC payback                   ⚠ needs disclosed KPI
+  Net revenue retention (NRR)   ⚠ needs disclosed KPI
+
+  Not in the financial statements — check the 10-K / investor deck (defined, not faked):
+    • Magic Number — net-new ARR ÷ prior-quarter S&M spend; >0.75 = efficient growth. Needs S&M + ARR disclosure.
+    • CAC payback — months of gross-margin-adjusted revenue to recover customer acquisition cost. Needs S&M + new-customer/ARR disclosure.
+    • Net revenue retention (NRR) — expansion − churn on existing customers; >120% is elite. A disclosed KPI, not in the financial statements.
 ```
 
 Frameworks: `saas`, `neocloud`, `semiconductor` (`python3 scripts/framework.py list`).

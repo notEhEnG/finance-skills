@@ -282,16 +282,35 @@ def safe_margin(numerator: float | None, denominator: float | None) -> float | N
     return round(numerator / denominator * 100.0, 1)
 
 
+def enterprise_value(market_cap: float | None, net_debt: float | None) -> float | None:
+    """Enterprise value = market cap + net debt, or None if either is unknown.
+
+    net_debt=None yields None (fail closed, like Fundamentals.net_debt) — imputing
+    0 would fabricate a concrete EV from incomplete data."""
+    if market_cap is None or net_debt is None:
+        return None
+    return market_cap + net_debt
+
+
 def ev_ebitda(market_cap: float | None, net_debt: float | None, ebitda: float | None) -> float | None:
     """Enterprise-value / EBITDA multiple, or None if not meaningfully computable.
 
-    net_debt=None yields None: EV can't be formed without it, and imputing 0 would
-    fabricate a concrete multiple from incomplete data (the same fail-closed rule
-    as Fundamentals.net_debt). Negative or zero EBITDA also yields None — the
-    multiple is meaningless there, so say n/a rather than print a nonsense number."""
-    if market_cap is None or net_debt is None or ebitda in (None, 0) or ebitda < 0:
+    None when EV can't be formed (see enterprise_value). Negative or zero EBITDA
+    also yields None — the multiple is meaningless there, so say n/a rather than
+    print a nonsense number."""
+    ev = enterprise_value(market_cap, net_debt)
+    if ev is None or ebitda in (None, 0) or ebitda < 0:
         return None
-    return round((market_cap + net_debt) / ebitda, 1)
+    return round(ev / ebitda, 1)
+
+
+def ev_sales(market_cap: float | None, net_debt: float | None, revenue: float | None) -> float | None:
+    """Enterprise-value / sales multiple, or None if not computable. Useful when a
+    DCF is unavailable (negative FCF) and EV/EBITDA is distorted."""
+    ev = enterprise_value(market_cap, net_debt)
+    if ev is None or revenue in (None, 0) or revenue < 0:
+        return None
+    return round(ev / revenue, 1)
 
 
 def yoy_growth(current: float | None, prior: float | None) -> float | None:

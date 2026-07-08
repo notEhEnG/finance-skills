@@ -102,6 +102,19 @@ class TestEvEbitda(unittest.TestCase):
         self.assertIsNone(metrics.ev_ebitda(48e9, 1e9, -5e8))
 
 
+class TestEnterpriseValue(unittest.TestCase):
+    def test_enterprise_value(self):
+        self.assertEqual(metrics.enterprise_value(48e9, 11.5e9), 59.5e9)
+        self.assertIsNone(metrics.enterprise_value(48e9, None))   # fail closed
+        self.assertIsNone(metrics.enterprise_value(None, 1e9))
+
+    def test_ev_sales(self):
+        # EV 59.5B / revenue 1.9B ≈ 31.3x.
+        self.assertEqual(metrics.ev_sales(48e9, 11.5e9, 1.9e9), 31.3)
+        self.assertIsNone(metrics.ev_sales(48e9, None, 1.9e9))    # unknown net debt
+        self.assertIsNone(metrics.ev_sales(48e9, 1e9, 0))         # no revenue
+
+
 class TestGuards(unittest.TestCase):
     def test_safe_margin_divzero_and_none(self):
         self.assertIsNone(metrics.safe_margin(10, 0))

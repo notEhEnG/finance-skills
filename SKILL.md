@@ -50,14 +50,26 @@ Handle any of them in three steps:
 3. **Run the matching command, then answer the actual question.** Every command
    is a view over the one engine (`scripts/analyze.py`), so numbers never diverge:
    ```bash
-   python3 scripts/company.py   <TICKER> [--fixture|--json]   # sequential walkthrough
-   python3 scripts/framework.py <name> <TICKER> [--fixture]    # a framework as a checklist
-   python3 scripts/analyze.py   <TICKER> [--fixture|--json]    # flagship report
-   python3 scripts/learn.py     <concept>                      # explain a concept (offline)
+   python3 scripts/company.py    <TICKER> [--fixture|--json]   # sequential walkthrough
+   python3 scripts/valuation.py  <TICKER> [--fixture|--json]   # "is it cheap?" as a table
+   python3 scripts/framework.py  <name> <TICKER> [--fixture]   # a framework as a checklist
+   python3 scripts/analyze.py    <TICKER> [--fixture|--json]   # flagship report
+   python3 scripts/learn.py      <concept>                     # explain a concept (offline)
    ```
    Read the output and answer in plain English — lead with the part that answers
    what they asked (e.g. "is it a buy?" → valuation + Rule 40 + risk), cite the
    concrete numbers with source + as-of, and end with the not-advice note.
+
+**Formatting — table vs prose (match the shape of the answer):**
+- **Table** when the answer is comparable numbers: `valuation`, `framework`,
+  `rule40`, `growth`, `risk`. Use a **Metric | Value | Read** layout (the Read
+  column says how to interpret each number). `valuation.py` and `framework.py`
+  already emit this; mirror it for the agent-rendered verbs.
+- **Side-by-side table** for `compare <a> <b>` — one column per ticker, metrics
+  as rows, so the contrast is instant.
+- **Prose / narrative** when the shape is a story or a judgment: `company` (keep
+  the sequential ▼ walkthrough), `moat` / `fiveforces` (qualitative), and
+  `learn` (an explainer). A table would flatten these — don't force one.
 
 If `yfinance` is missing: `pip install yfinance`.
 
@@ -104,7 +116,7 @@ view over the same engine, so numbers never diverge:
 - `company <ticker>` — 9-stage sequential walkthrough (Business Model → … → Verdict)
 - `analyze <ticker>` — full analyst report (flagship engine dump)
 - `framework <name> <ticker>` — a whole lens at once (saas / neocloud / semiconductor)
-- `valuation <ticker>` — lead with DCF + EV/EBITDA
+- `valuation <ticker>` — "is it cheap?" as a Metric/Value/Read table (DCF, EV/Sales, EV/EBITDA, Rule 40) → `scripts/valuation.py`
 - `dcf <ticker>` — intrinsic value only
 - `rule40 <ticker>` — the segment-aware Rule of 40 slice
 - `growth <ticker>` — revenue/margin trend + regime

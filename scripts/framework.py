@@ -136,16 +136,21 @@ def _render(r: dict, name: str, title: str, rows: list[dict]) -> str:
         "",
     ]
     width = max(len(row["metric"]) for row in rows)
+    out.append(f"  {'Metric'.ljust(width)}   Value / status")
+    out.append(f"  {'─' * (width + 40)}")
+    kpis: list[tuple[str, str]] = []
     for row in rows:
         if row["kpi"]:
-            out.append(f"  {row['metric'].ljust(width)}  ·  needs disclosed KPI")
-            out.append(f"  {' '.ljust(width)}     ↳ {row['kpi']}")
+            out.append(f"  {row['metric'].ljust(width)}   ⚠ needs disclosed KPI")
+            kpis.append((row["metric"], row["kpi"]))
         else:
-            out.append(f"  {row['metric'].ljust(width)}  :  {row['value']}")
+            out.append(f"  {row['metric'].ljust(width)}   {row['value']}")
+    if kpis:
+        out += ["", "  Not in the financial statements — check the 10-K / investor deck "
+                    "(defined, not faked):"]
+        for metric, defn in kpis:
+            out.append(f"    • {metric} — {defn}")
     out += [
-        "",
-        "Rows marked \"needs disclosed KPI\" aren't in the financial statements — check the "
-        "company's 10-K / investor deck; they are not computed here rather than faked.",
         "─" * 60,
         "Read-only market analysis for research/education. Not investment advice; "
         "no trades are placed. Verify figures against primary filings before acting.",
