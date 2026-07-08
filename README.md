@@ -61,6 +61,99 @@ the actual question with cited numbers. So all of these are equivalent:
 /finance-skills analyze NBIS
 ```
 
+## Slash commands
+
+The default is **plain English** (Layer 1). For power users there are **5
+memorable verbs** (Layer 2); everything else is auto-triggered inside `analyze`
+or reachable by asking, not memorised. All verbs are served by the one shared
+engine, so numbers never diverge.
+
+| Command | Answers | Backed by |
+|---|---|---|
+| `/finance-skills <question>` | anything — routes to the right lens | `analyze` + intent routing |
+| `/finance-skills analyze <ticker\|question>` | "should I invest?" end-to-end (flagship) | `scripts/analyze.py` |
+| `/finance-skills valuation <ticker>` | "is it cheap?" | DCF + multiples + Rule 40 view of `analyze` |
+| `/finance-skills growth <ticker>` | "is it growing?" | growth + margins + regime view |
+| `/finance-skills risk <ticker>` | "what could go wrong?" | leverage, FCF, dilution, capital-intensity gap |
+| `/finance-skills moat <ticker>` | "does it have a durable edge?" | margins vs peers + `references/` |
+| `/finance-skills help` | grouped command help | `scripts/router.py help` |
+
+Shorthand and typos resolve instead of erroring (`val`→valuation, `r40`→rule40,
+`comp`→compare, `semis`→semiconductor, `vluation`→valuation). Sub-frameworks like
+`rule40`, `ai-cloud`, `compare`, `redflags` remain reachable for power users but
+aren't top-level verbs.
+
+### `analyze` — example output
+
+`/finance-skills analyze CRWV` (shown on the offline sample via `--fixture`;
+live output has the same shape with a yfinance source + timestamp):
+
+```text
+═══ CoreWeave, Inc. (CRWV) ═══
+Source: fixture · as of 2026-Q1  [SAMPLE DATA — not live]
+Sector: Technology / Information Technology Services
+Price: $100   Market cap: $48.00B
+
+Fundamentals (derived):
+  Revenue growth (YoY): 111.1%
+  EBITDA margin: 56.0%   FCF margin: -315.8%
+  Capex intensity: 463.2%   Share dilution: 9.1%
+  Net debt: $11.50B
+
+Rule of 40 — regime: ai neocloud
+  EBITDA-based: 167   FCF-based: -205   capital-intensity gap: 372
+  Capex-adjusted: -668   dilution-adjusted: -677
+  Judged on -668 vs benchmark 38 → BELOW BAR
+  Verdict: Capital-intensive: growth is burning cash faster than it earns; watch backlog/RPO and funding runway.
+    • Neocloud regime: the EBITDA-based score overstates health; judging on the capex-adjusted FCF score to reflect real GPU capital burn.
+    • Large capital-intensity gap (372 pts) — growth is capex-funded, not organically profitable.
+
+DCF: DCF skipped: free cash flow is not positive (typical for capex-heavy growth names).
+Leverage: net debt / EBITDA = 10.81x
+
+────────────────────────────────────────────────────────────
+Read-only market analysis for research/education. Not investment advice; no trades are placed. Verify figures against primary filings before acting.
+```
+
+The `valuation`, `growth`, `risk`, and `moat` verbs run the same engine and lead
+with the matching slice of that report (e.g. `risk` leads with leverage 10.81×,
+the −372 capital-intensity gap, and dilution).
+
+### `help` — example output
+
+`/finance-skills help`:
+
+```text
+finance-skills — ask in plain English, or use a verb.
+
+Top verbs:  analyze  valuation  growth  risk  moat
+
+By question:
+  Is it cheap?           →  valuation, rule40, benchmark
+  Is it safe?            →  risk, redflags, health
+  Will it grow?          →  growth, opportunities, earnings
+  Does it have an edge?  →  moat, management, classify
+  How does it compare?   →  compare, competitors, benchmark
+  What's happening now?  →  news, earnings
+  Sector-specific        →  semiconductor, ai-cloud, banking, reit, insurance
+  Power tools            →  screen, rank, portfolio, watchlist, export
+
+Shorthand works too: val→valuation, r40→rule40, comp→compare, semis→semiconductor.
+Typos are tolerated (e.g. 'vluation' → valuation).
+```
+
+### Natural-language front door — example
+
+`/finance-skills Do you think NBIS and CRWV is a buy?` first extracts the tickers,
+then runs the engine per ticker:
+
+```text
+$ python3 scripts/router.py tickers "Do you think NBIS and CRWV is a buy?"
+NBIS CRWV
+$ python3 scripts/router.py r40
+r40 → rule40 (alias)
+```
+
 ## Architecture
 
 ```

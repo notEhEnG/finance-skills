@@ -159,7 +159,7 @@ def extract_tickers(text: str) -> list[str]:
 
 def format_help() -> str:
     lines = [
-        "financial-skills — ask in plain English, or use a verb.",
+        "finance-skills — ask in plain English, or use a verb.",
         "",
         "Top verbs:  " + "  ".join(TOP_VERBS),
         "",
