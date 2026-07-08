@@ -40,17 +40,22 @@ Handle any of them in three steps:
    ```
    If no ticker can be found, ask the user which company they mean.
 
-2. **Determine intent.** If the first token is a verb (`analyze`, `valuation`,
-   `growth`, `risk`, `moat`) or a known alias (`val`, `r40`, `comp`, …), use it.
-   Otherwise infer intent from the question via the routing table below. Resolve
-   shorthand/typos with `python3 scripts/router.py <token>`.
+2. **Determine intent.** If the first token is a verb (`company`, `analyze`,
+   `valuation`, `framework`, `compare`, `learn`, `growth`, `risk`, `moat`,
+   `dcf`, `rule40`, `fiveforces`, `industry`, …) or a known alias (`co`, `fw`,
+   `val`, `r40`, `comp`, …), use it. Otherwise infer intent from the question via
+   the routing table below. Resolve shorthand/typos with
+   `python3 scripts/router.py <token>`.
 
-3. **Run the engine, then answer the actual question.**
+3. **Run the matching command, then answer the actual question.** Every command
+   is a view over the one engine (`scripts/analyze.py`), so numbers never diverge:
    ```bash
-   python3 scripts/analyze.py <TICKER> --json      # live
-   python3 scripts/analyze.py <TICKER> --fixture    # offline sample
+   python3 scripts/company.py   <TICKER> [--fixture|--json]   # sequential walkthrough
+   python3 scripts/framework.py <name> <TICKER> [--fixture]    # a framework as a checklist
+   python3 scripts/analyze.py   <TICKER> [--fixture|--json]    # flagship report
+   python3 scripts/learn.py     <concept>                      # explain a concept (offline)
    ```
-   Read the JSON and answer in plain English — lead with the part that answers
+   Read the output and answer in plain English — lead with the part that answers
    what they asked (e.g. "is it a buy?" → valuation + Rule 40 + risk), cite the
    concrete numbers with source + as-of, and end with the not-advice note.
 
@@ -64,6 +69,9 @@ If `yfinance` is missing: `pip install yfinance`.
 | safe / risky / could it collapse | net debt, leverage, FCF, dilution, capital-intensity gap |
 | growing / trend | revenue growth, margins, regime |
 | business quality / edge / moat | margins vs peers, moat (references) |
+| "tell me about X" / full picture | `company.py` — the 9-stage walkthrough |
+| SaaS / neocloud / semis checklist | `framework.py <name>` — runs the whole lens at once |
+| "what is / explain <concept>" | `learn.py <concept>` — teach it, no ticker needed |
 | compare to X | run the engine for both, contrast |
 | AI-cloud / GPU / backlog | load `references/ai-cloud.md`, stress capex-adjusted Rule 40 |
 
@@ -73,35 +81,54 @@ Semantic intent, not keyword match — "is this stock a trap" → risk + redflag
 
 One shared engine backs everything (`scripts/`), so numbers never diverge:
 - `data.py` — fetches & normalises fundamentals via yfinance (graceful fallback, 6h cache).
-- `metrics.py` — pure math: the **segment-aware Rule of 40**, DCF, Altman Z, Piotroski.
+- `metrics.py` — pure math: the **segment-aware Rule of 40**, DCF, EV/EBITDA, Altman Z, Piotroski.
 - `analyze.py` — orchestrates fetch → compute → report (`--json` for composing).
+- `company.py` — sequences the engine into a 9-stage narrative walkthrough.
+- `framework.py` — runs a named framework (saas, neocloud, semiconductor) as a checklist.
+- `learn.py` — offline concept explainers (no ticker, no network).
 - `router.py` — ticker extraction, alias/fuzzy command resolution, grouped help.
+
+Honesty rule: `framework.py` computes only what the filings support. Metrics that
+need a **disclosed KPI not in the financial statements** (Magic Number, CAC
+payback, NRR, backlog/RPO) are flagged "needs disclosed KPI" with their
+definition — never fabricated. Say the same when answering in prose.
 
 ## Two layers of use
 
 **Layer 1 — natural language (default).** Most users just ask a question; follow
 the invocation contract above.
 
-**Layer 2 — five memorable verbs (power users).** Everything else is a view over
-`analyze`, not a command to memorise:
+**Layer 2 — memorable verbs (power users), the primary interface.** Each is a
+view over the same engine, so numbers never diverge:
 
-- `analyze <ticker>` — full report (flagship)
-- `valuation <ticker>` — lead with DCF + multiples
+- `company <ticker>` — 9-stage sequential walkthrough (Business Model → … → Verdict)
+- `analyze <ticker>` — full analyst report (flagship engine dump)
+- `framework <name> <ticker>` — a whole lens at once (saas / neocloud / semiconductor)
+- `valuation <ticker>` — lead with DCF + EV/EBITDA
+- `dcf <ticker>` — intrinsic value only
+- `rule40 <ticker>` — the segment-aware Rule of 40 slice
 - `growth <ticker>` — revenue/margin trend + regime
 - `risk <ticker>` — leverage, FCF, dilution, concentration
-- `moat <ticker>` — durable-edge assessment
+- `moat <ticker>` / `fiveforces <ticker>` — durable-edge / Porter assessment
+- `compare <a> <b>` — run both, contrast
+- `learn <concept>` — teach a concept (dcf, rule40, magic-number, nrr, …)
+
+`fiveforces` and `industry` are qualitative: apply the framework using the
+engine's margins/growth as evidence (`learn.py five-forces` gives the template);
+don't invent force ratings from the financials.
 
 ### Help & aliases
 
 If asked for help, group by the question — never an alphabetical dump:
 
 ```
-Is it cheap?          → valuation, rule40, benchmark
+Whole company         → company, analyze, framework
+Is it cheap?          → valuation, dcf, rule40, benchmark
 Is it safe?           → risk, redflags, health
 Will it grow?         → growth, opportunities, earnings
-Does it have an edge? → moat, management, classify
-How does it compare?  → compare, competitors, benchmark
-What's happening now? → news, earnings
+Does it have an edge? → moat, fiveforces, management
+How does it compare?  → compare, competitors, industry
+Learn a concept       → learn
 Sector-specific       → semiconductor, ai-cloud, banking, reit, insurance
 Power tools           → screen, rank, portfolio, watchlist, export
 ```

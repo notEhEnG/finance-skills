@@ -16,29 +16,31 @@ import sys
 from dataclasses import dataclass
 from difflib import get_close_matches
 
-# The 5 advertised top-level verbs (overview-2 "Layer 2").
-TOP_VERBS = ["analyze", "valuation", "growth", "risk", "moat"]
+# The advertised top-level verbs — the primary interface. `company` is the
+# flagship sequential walkthrough; the rest are the most-reached lenses.
+TOP_VERBS = ["company", "analyze", "valuation", "framework", "compare", "learn"]
 
 # Help grouped by the investor question it answers (overview-2 "Help Command").
 HELP_GROUPS: dict[str, list[str]] = {
-    "Is it cheap?": ["valuation", "rule40", "benchmark"],
-    "Is it safe?": ["risk", "redflags", "health"],
-    "Will it grow?": ["growth", "opportunities", "earnings"],
-    "Does it have an edge?": ["moat", "management", "classify"],
-    "How does it compare?": ["compare", "competitors", "benchmark"],
-    "What's happening now?": ["news", "earnings"],
-    "Sector-specific": ["semiconductor", "ai-cloud", "banking", "reit", "insurance"],
-    "Power tools": ["screen", "rank", "portfolio", "watchlist", "export"],
+    "Whole company":       ["company", "analyze", "framework"],
+    "Is it cheap?":        ["valuation", "dcf", "rule40", "benchmark"],
+    "Is it safe?":         ["risk", "redflags", "health"],
+    "Will it grow?":       ["growth", "opportunities", "earnings"],
+    "Does it have an edge?": ["moat", "fiveforces", "management"],
+    "How does it compare?": ["compare", "competitors", "industry"],
+    "Learn a concept":     ["learn"],
+    "Sector-specific":     ["semiconductor", "ai-cloud", "banking", "reit", "insurance"],
+    "Power tools":         ["screen", "rank", "portfolio", "watchlist", "export"],
 }
 
 # Full canonical command set = top verbs + everything referenced anywhere.
 CANONICAL: set[str] = set(TOP_VERBS) | {
-    "analyze", "overview", "classify", "health", "profitability", "growth",
-    "valuation", "rule40", "ai-cloud", "semiconductor", "banking", "reit",
-    "insurance", "marketplace", "industrial", "moat", "management", "risk",
-    "competitors", "compare", "benchmark", "redflags", "opportunities",
-    "earnings", "news", "screen", "rank", "portfolio", "watchlist", "export",
-    "help",
+    "analyze", "company", "framework", "overview", "classify", "health",
+    "profitability", "growth", "valuation", "dcf", "rule40", "ai-cloud",
+    "semiconductor", "banking", "reit", "insurance", "marketplace", "industrial",
+    "moat", "fiveforces", "industry", "management", "risk", "competitors",
+    "compare", "benchmark", "redflags", "opportunities", "earnings", "news",
+    "learn", "screen", "rank", "portfolio", "watchlist", "export", "help",
 }
 
 # Shorthand and common typos/spellings -> canonical (overview-2 "Alias Forgiveness").
@@ -54,6 +56,12 @@ ALIASES: dict[str, str] = {
     "analyse": "analyze", "report": "analyze",
     "grow": "growth", "risks": "risk", "moats": "moat",
     "comps": "competitors", "peers": "competitors",
+    "co": "company", "companies": "company", "business": "company",
+    "fw": "framework", "frameworks": "framework", "checklist": "framework",
+    "dcf-value": "dcf", "intrinsic": "dcf", "intrinsic-value": "dcf",
+    "5forces": "fiveforces", "five-forces": "fiveforces", "porter": "fiveforces",
+    "learn-more": "learn", "teach": "learn", "explain": "learn", "what-is": "learn",
+    "sector": "industry", "industries": "industry",
 }
 
 

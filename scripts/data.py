@@ -44,6 +44,7 @@ class Fundamentals:
 
     revenue: float | None = None
     revenue_prior: float | None = None
+    gross_profit: float | None = None
     ebitda: float | None = None
     free_cash_flow: float | None = None
     capex: float | None = None            # stored as a positive magnitude
@@ -196,6 +197,7 @@ def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
             market_cap=_num(info.get("marketCap")),
             revenue=_col(income, ["Total Revenue", "TotalRevenue"], 0) or _num(info.get("totalRevenue")),
             revenue_prior=_col(income, ["Total Revenue", "TotalRevenue"], 1),
+            gross_profit=_first(income, ["Gross Profit", "GrossProfit"]) or _num(info.get("grossProfits")),
             ebitda=_first(income, ["EBITDA", "Normalized EBITDA"]) or _num(info.get("ebitda")),
             free_cash_flow=_first(cash, ["Free Cash Flow", "FreeCashFlow"]) or _num(info.get("freeCashflow")),
             capex=abs(capex_raw) if capex_raw is not None else None,
@@ -245,6 +247,7 @@ _FIXTURES = {
         name="CoreWeave, Inc.", sector="Technology", industry="Information Technology Services",
         price=100.0, market_cap=48_000_000_000,
         revenue=1_900_000_000, revenue_prior=900_000_000,   # ~112% YoY
+        gross_profit=1_330_000_000,                         # ~70% gross margin
         ebitda=1_064_000_000,                               # ~56% EBITDA margin
         free_cash_flow=-6_000_000_000, capex=8_800_000_000,  # heavy GPU capex
         net_income=-300_000_000, total_debt=12_900_000_000, total_cash=1_400_000_000,
@@ -255,6 +258,7 @@ _FIXTURES = {
         name="Nebius Group N.V.", sector="Technology", industry="Information Technology Services",
         price=45.0, market_cap=10_000_000_000,
         revenue=1_577_000_000, revenue_prior=201_000_000,   # ~684% YoY
+        gross_profit=505_000_000,                           # ~32% gross margin
         ebitda=205_000_000,                                 # ~13% EBITDA margin
         free_cash_flow=-7_300_000_000, capex=8_000_000_000,
         net_income=-400_000_000, total_debt=2_000_000_000, total_cash=3_000_000_000,

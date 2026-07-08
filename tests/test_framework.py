@@ -1,0 +1,43 @@
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+
+import framework
+from data import load_fixture
+
+
+class TestFramework(unittest.TestCase):
+    def test_resolve_aliases(self):
+        self.assertEqual(framework.resolve_framework("SaaS"), "saas")
+        self.assertEqual(framework.resolve_framework("software"), "saas")
+        self.assertEqual(framework.resolve_framework("gpu"), "neocloud")
+        self.assertIsNone(framework.resolve_framework("nonsense"))
+
+    def test_saas_computes_real_metrics_and_flags_kpis(self):
+        r = framework.build_framework("saas", load_fixture("CRWV"), as_json=True)
+        rows = {row["metric"]: row for row in r["rows"]}
+        # Computable from the engine — must have a value, no KPI note.
+        self.assertIsNotNone(rows["Gross margin"]["value"])
+        self.assertEqual(rows["Gross margin"]["value"], "70.0%")
+        self.assertIsNone(rows["Gross margin"]["kpi"])
+        # Disclosed KPIs — must be flagged, never fabricated into a number.
+        for kpi_metric in ("Magic Number", "CAC payback", "Net revenue retention (NRR)"):
+            self.assertIsNone(rows[kpi_metric]["value"])
+            self.assertIsNotNone(rows[kpi_metric]["kpi"])
+
+    def test_text_render_labels_kpis_and_sample_data(self):
+        text = framework.build_framework("saas", load_fixture("CRWV"), as_json=False)
+        self.assertIn("needs disclosed KPI", text)
+        self.assertIn("SAMPLE DATA", text)
+        self.assertIn("Not investment advice", text)
+
+    def test_every_framework_renders_for_a_fixture(self):
+        for name in framework.FRAMEWORKS:
+            text = framework.build_framework(name, load_fixture("NBIS"), as_json=False)
+            self.assertIn("framework", text)
+
+
+if __name__ == "__main__":
+    unittest.main()

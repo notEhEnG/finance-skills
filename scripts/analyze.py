@@ -66,6 +66,7 @@ def build_report(f: Fundamentals, as_json: bool = False):
         return {"ticker": f.ticker, "available": False, "error": f.error} if as_json else msg
 
     revenue_growth = metrics.yoy_growth(f.revenue, f.revenue_prior)
+    gross_margin = metrics.safe_margin(f.gross_profit, f.revenue)
     ebitda_margin = metrics.safe_margin(f.ebitda, f.revenue)
     fcf_margin = metrics.safe_margin(f.free_cash_flow, f.revenue)
     capex_intensity = metrics.safe_margin(f.capex, f.revenue)
@@ -81,12 +82,15 @@ def build_report(f: Fundamentals, as_json: bool = False):
         "price": f.price,
         "market_cap": f.market_cap,
         "derived": {
+            "revenue": f.revenue,
             "revenue_growth_pct": revenue_growth,
+            "gross_margin_pct": gross_margin,
             "ebitda_margin_pct": ebitda_margin,
             "fcf_margin_pct": fcf_margin,
             "capex_intensity_pct": capex_intensity,
             "share_dilution_pct": share_dilution,
             "net_debt": f.net_debt,
+            "ev_ebitda": metrics.ev_ebitda(f.market_cap, f.net_debt, f.ebitda),
         },
     }
 

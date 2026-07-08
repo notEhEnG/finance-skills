@@ -282,6 +282,17 @@ def safe_margin(numerator: float | None, denominator: float | None) -> float | N
     return round(numerator / denominator * 100.0, 1)
 
 
+def ev_ebitda(market_cap: float | None, net_debt: float | None, ebitda: float | None) -> float | None:
+    """Enterprise-value / EBITDA multiple, or None if not meaningfully computable.
+
+    net_debt=None is treated as 0 (EV ≈ market cap); callers should note when net
+    debt was unknown. Negative or zero EBITDA yields None (the multiple is
+    meaningless there — say so rather than print a nonsense number)."""
+    if market_cap is None or ebitda in (None, 0) or ebitda < 0:
+        return None
+    return round((market_cap + (net_debt or 0.0)) / ebitda, 1)
+
+
 def yoy_growth(current: float | None, prior: float | None) -> float | None:
     """YoY growth percent with guards. Prior must be positive to be meaningful."""
     if current is None or prior in (None, 0) or prior < 0:

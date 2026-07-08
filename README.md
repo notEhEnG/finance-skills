@@ -63,25 +63,119 @@ the actual question with cited numbers. So all of these are equivalent:
 
 ## Slash commands
 
-The default is **plain English** (Layer 1). For power users there are **5
-memorable verbs** (Layer 2); everything else is auto-triggered inside `analyze`
-or reachable by asking, not memorised. All verbs are served by the one shared
-engine, so numbers never diverge.
+Plain English always works (Layer 1). But the **verbs are the primary interface** —
+a polished CLI over one shared engine, so numbers never diverge across commands.
 
 | Command | Answers | Backed by |
 |---|---|---|
 | `/finance-skills <question>` | anything — routes to the right lens | `analyze` + intent routing |
-| `/finance-skills analyze <ticker\|question>` | "should I invest?" end-to-end (flagship) | `scripts/analyze.py` |
-| `/finance-skills valuation <ticker>` | "is it cheap?" | DCF + multiples + Rule 40 view of `analyze` |
-| `/finance-skills growth <ticker>` | "is it growing?" | growth + margins + regime view |
-| `/finance-skills risk <ticker>` | "what could go wrong?" | leverage, FCF, dilution, capital-intensity gap |
+| `/finance-skills company <ticker>` | "tell me about this company" — a guided walkthrough | `scripts/company.py` |
+| `/finance-skills analyze <ticker>` | "should I invest?" end-to-end (flagship) | `scripts/analyze.py` |
+| `/finance-skills framework <name> <ticker>` | "run the SaaS / neocloud / semis lens" | `scripts/framework.py` |
+| `/finance-skills valuation <ticker>` | "is it cheap?" | DCF + EV/EBITDA + Rule 40 |
+| `/finance-skills dcf <ticker>` | "what's it worth?" | DCF slice of `analyze` |
+| `/finance-skills rule40 <ticker>` | "is growth efficient?" | segment-aware Rule of 40 |
+| `/finance-skills growth <ticker>` | "is it growing?" | growth + margins + regime |
+| `/finance-skills risk <ticker>` | "what could go wrong?" | leverage, FCF, dilution, capex gap |
 | `/finance-skills moat <ticker>` | "does it have a durable edge?" | margins vs peers + `references/` |
+| `/finance-skills fiveforces <ticker>` | "how good is the industry structure?" | Porter, applied to engine evidence |
+| `/finance-skills compare <a> <b>` | "which is better?" | run both, contrast |
+| `/finance-skills learn <concept>` | "what *is* a Magic Number / DCF / NRR?" | `scripts/learn.py` (offline) |
 | `/finance-skills help` | grouped command help | `scripts/router.py help` |
 
-Shorthand and typos resolve instead of erroring (`val`→valuation, `r40`→rule40,
-`comp`→compare, `semis`→semiconductor, `vluation`→valuation). Sub-frameworks like
-`rule40`, `ai-cloud`, `compare`, `redflags` remain reachable for power users but
-aren't top-level verbs.
+Shorthand and typos resolve instead of erroring (`co`→company, `fw`→framework,
+`val`→valuation, `r40`→rule40, `5forces`→fiveforces, `vluation`→valuation).
+
+### `company` — example output (the guided walkthrough)
+
+`/finance-skills company CRWV` steps through the business top-to-bottom, each
+stage flowing into the next, and ends with a synthesised verdict:
+
+```text
+═══ CoreWeave, Inc. (CRWV) — company walkthrough ═══
+Source: fixture · as of 2026-Q1  [SAMPLE DATA — not live]
+Price: $100   Market cap: $48.00B
+
+■ Business Model
+    Sector: Technology / Information Technology Services
+    AI neocloud/hyperscaler — extreme growth funded by heavy GPU capex; judged on cash burn and backlog, not headline EBITDA.
+        ▼
+■ Competitive Advantage
+    Gross margin 70.0% — high; suggests pricing power or a software-like cost structure.
+    EBITDA margin 56.0% — operating leverage already showing.
+        ▼
+■ Revenue Drivers
+    Revenue: $1.90B
+    Growth (YoY): 111.1%.
+        ▼
+■ Margins
+    Gross: 70.0%   EBITDA: 56.0%   FCF: -315.8%
+    Negative free cash flow — growth is consuming cash (normal for the regime, watch runway).
+        ▼
+■ Financial Health
+    Net debt: $11.50B
+    Net debt / EBITDA: 10.81x — elevated; watch refinancing and covenants.
+        ▼
+■ Growth
+    Growth rate: 111.1%
+    AI neocloud/hyperscaler regime.
+        ▼
+■ Valuation
+    DCF: DCF skipped: free cash flow is not positive (typical for capex-heavy growth names).
+    EV/EBITDA: 55.9x.
+        ▼
+■ Risks
+    Capital-intensity gap 372 pts — growth is capex-funded, not organically profitable.
+    Below its Rule-of-40 bar (judged -668 vs 38).
+    Share dilution 9.1% YoY — growth partly 'bought' with equity.
+    Cash burn — depends on continued access to funding.
+        ▼
+■ Final Verdict
+    A capital-intensive neocloud: the story is backlog and funding runway, not this quarter's margin.
+    Falls short of its Rule-of-40 bar today.
+    No DCF (FCF not positive), so lean on Rule-of-40 and multiples instead of intrinsic value.
+    Not a recommendation — verify against primary filings before acting.
+```
+
+### `framework` — run a whole lens at once (honest about data)
+
+`/finance-skills framework saas CRWV` runs every SaaS metric instead of making
+you pick. Metrics that need a **disclosed KPI not in the financial statements**
+(Magic Number, CAC payback, NRR) are flagged with their definition — never faked:
+
+```text
+═══ CoreWeave, Inc. (CRWV) — SaaS / software quality framework ═══
+Source: fixture · as of 2026-Q1  [SAMPLE DATA — not live]
+
+  Rule of 40                   :  judged -668 vs 38 bar → BELOW BAR (EBITDA 167 / FCF -205, gap 372)
+  Gross margin                 :  70.0%
+  FCF margin                   :  -315.8%
+  Revenue growth (YoY)         :  111.1%
+  EV/EBITDA                    :  55.9x
+  Magic Number                 ·  needs disclosed KPI
+                                  ↳ net-new ARR ÷ prior-quarter S&M spend; >0.75 = efficient growth. Needs S&M + ARR disclosure.
+  CAC payback                  ·  needs disclosed KPI
+                                  ↳ months of gross-margin-adjusted revenue to recover customer acquisition cost. Needs S&M + new-customer/ARR disclosure.
+  Net revenue retention (NRR)  ·  needs disclosed KPI
+                                  ↳ expansion − churn on existing customers; >120% is elite. A disclosed KPI, not in the financial statements.
+```
+
+Frameworks: `saas`, `neocloud`, `semiconductor` (`python3 scripts/framework.py list`).
+
+### `learn` — teach the concept, no ticker needed
+
+`/finance-skills learn dcf` (also `rule40`, `magic-number`, `nrr`, `five-forces`, …):
+
+```text
+═══ dcf ═══
+Discounted cash flow: a company is worth the present value of its future free cash flow.
+
+How to compute / read it:
+  Two-stage model: grow FCF for N years, discount each year back, add a Gordon terminal value, subtract net debt, divide by shares. Here growth is a heuristic (trailing revenue growth, capped), discount 10%, terminal 3%.
+
+Common trap:
+  Output is only as good as the assumptions — tiny changes in growth/discount swing it wildly. Treat it as a rough anchor, and note it's skipped when FCF is negative.
+```
 
 ### `analyze` — example output
 
@@ -126,15 +220,16 @@ the 372-pt capital-intensity gap, and dilution).
 ```text
 finance-skills — ask in plain English, or use a verb.
 
-Top verbs:  analyze  valuation  growth  risk  moat
+Top verbs:  company  analyze  valuation  framework  compare  learn
 
 By question:
-  Is it cheap?           →  valuation, rule40, benchmark
+  Whole company          →  company, analyze, framework
+  Is it cheap?           →  valuation, dcf, rule40, benchmark
   Is it safe?            →  risk, redflags, health
   Will it grow?          →  growth, opportunities, earnings
-  Does it have an edge?  →  moat, management, classify
-  How does it compare?   →  compare, competitors, benchmark
-  What's happening now?  →  news, earnings
+  Does it have an edge?  →  moat, fiveforces, management
+  How does it compare?   →  compare, competitors, industry
+  Learn a concept        →  learn
   Sector-specific        →  semiconductor, ai-cloud, banking, reit, insurance
   Power tools            →  screen, rank, portfolio, watchlist, export
 
@@ -162,8 +257,11 @@ finance-skills/
 ├── install.sh              # install as an agent skill (claude/antigravity/codex)
 ├── scripts/
 │   ├── data.py             # yfinance fetch + normalise + 6h cache + graceful fallback
-│   ├── metrics.py          # PURE engine: segment-aware Rule 40, DCF, Altman Z, Piotroski
+│   ├── metrics.py          # PURE engine: segment-aware Rule 40, DCF, EV/EBITDA, Altman Z, Piotroski
 │   ├── analyze.py          # orchestrator: fetch → compute → report (flagship `analyze`)
+│   ├── company.py          # 9-stage sequential walkthrough (view over analyze)
+│   ├── framework.py        # named frameworks as checklists (saas/neocloud/semiconductor)
+│   ├── learn.py            # offline concept explainers (no ticker, no network)
 │   └── router.py           # ticker extraction + alias/fuzzy resolver + grouped help (pure)
 ├── references/
 │   ├── rule40.md           # segment-aware Rule of 40 methodology + benchmarks
@@ -174,7 +272,7 @@ finance-skills/
 
 The **engine is one source of truth**: `metrics.py` is pure and offline-testable;
 `data.py` is the only module that touches the network; `analyze.py` composes them.
-Every specialised command (valuation, growth, risk, rule40, ai-cloud, compare…) is
+Every specialised command (company, framework, valuation, dcf, rule40, risk…) is
 a *view* over `analyze`, so numbers never diverge between commands.
 
 ## CLI usage (also drives the skill)
@@ -183,7 +281,9 @@ a *view* over `analyze`, so numbers never diverge between commands.
 pip install -r requirements.txt
 
 python3 scripts/analyze.py NVDA            # full live report
-python3 scripts/analyze.py NVDA --json      # structured output
+python3 scripts/company.py NVDA             # guided 9-stage walkthrough
+python3 scripts/framework.py saas NVDA      # run the SaaS lens as a checklist
+python3 scripts/learn.py rule40             # explain a concept (offline)
 python3 scripts/analyze.py CRWV --fixture   # offline sample (no network)
 python3 scripts/router.py tickers "is NBIS a buy?"   # -> NBIS
 python3 scripts/router.py help              # grouped help
@@ -198,17 +298,22 @@ samples, clearly labelled non-live) or the skill will say live data is unavailab
 ## Development
 
 ```bash
-python3 -m pytest tests/ -q     # 32 offline tests (no network needed)
+python3 -m pytest tests/ -q     # 59 offline tests (no network needed)
 ```
 
 - `tests/test_metrics.py` — regime classification, dual-margin/capex-adjusted
   Rule 40 (locks the CoreWeave/Nebius examples), DCF guards, Altman Z, Piotroski.
 - `tests/test_analyze.py` — orchestrator on fixtures + graceful no-data path.
+- `tests/test_data.py` — statement column-ordering + net-debt fail-closed behaviour.
+- `tests/test_company.py` — the 9 walkthrough stages, in order, with data-gap flags.
+- `tests/test_framework.py` — computed metrics vs honestly-flagged disclosed KPIs.
+- `tests/test_learn.py` — concept/alias/fuzzy resolution for the explainers.
 - `tests/test_router.py` — ticker extraction, alias/fuzzy resolution, grouped help.
 
 ## Status & roadmap
 
-The **vertical slice**: the real engine proven end-to-end on live data plus
-offline fixtures, installable as a cross-tool skill. Next, layered over the same
-engine: more sector references (`semiconductor.md`, `banking.md`, `reit.md`),
-`compare`/`screen`/`rank` views, trend arrows, and backlog/RPO ingestion.
+The real engine proven end-to-end on live data plus offline fixtures, installable
+as a cross-tool skill, with a **verb-first CLI** (`company`, `framework`, `learn`,
+…) layered over it. Next, over the same engine: more sector references
+(`semiconductor.md`, `banking.md`, `reit.md`), `screen`/`rank` views, trend
+arrows, and backlog/RPO ingestion to light up the framework KPI rows.
