@@ -91,6 +91,10 @@ Shorthand and typos resolve instead of erroring (`co`→company, `fw`→framewor
 `/finance-skills company CRWV` steps through the business top-to-bottom, each
 stage flowing into the next, and ends with a synthesised verdict:
 
+**At a glance:** the 9 stages for CRWV — strong margins (gross **70%**) but
+**BELOW** its Rule-of-40 bar, negative FCF, and a verdict that hinges on
+**backlog & funding runway**.
+
 ```text
 ═══ CoreWeave, Inc. (CRWV) — company walkthrough ═══
 Source: fixture · as of 2026-Q1  [SAMPLE DATA — not live]
@@ -143,6 +147,10 @@ Price: $100   Market cap: $48.00B
 you pick. Metrics that need a **disclosed KPI not in the financial statements**
 (Magic Number, CAC payback, NRR) are flagged with their definition — never faked:
 
+**At a glance:** computed from filings — Rule of 40 **BELOW BAR**, gross margin
+**70.0%**, EV/EBITDA **55.9x**; Magic Number, CAC payback & NRR flagged
+_**needs disclosed KPI**_ rather than fabricated.
+
 ```text
 ═══ CoreWeave, Inc. (CRWV) — SaaS / software quality framework ═══
 Source: fixture · as of 2026-Q1  [SAMPLE DATA — not live]
@@ -181,6 +189,9 @@ Common trap:
 
 `/finance-skills analyze CRWV` (shown on the offline sample via `--fixture`;
 live output has the same shape with a yfinance source + timestamp):
+
+**At a glance:** CRWV — AI-neocloud regime · Rule of 40 **BELOW BAR** (-668 vs
+38) · burning cash (FCF **-315.8%**) · leverage **10.81x**.
 
 ```text
 ═══ CoreWeave, Inc. (CRWV) ═══
