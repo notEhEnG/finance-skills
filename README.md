@@ -117,7 +117,7 @@ Read-only market analysis for research/education. Not investment advice; no trad
 
 The `valuation`, `growth`, `risk`, and `moat` verbs run the same engine and lead
 with the matching slice of that report (e.g. `risk` leads with leverage 10.81×,
-the −372 capital-intensity gap, and dilution).
+the 372-pt capital-intensity gap, and dilution).
 
 ### `help` — example output
 

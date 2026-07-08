@@ -92,9 +92,31 @@ def _write_cache(f: Fundamentals) -> None:
         pass  # caching is best-effort
 
 
+def _order_latest_first(df):
+    """Reorder statement columns most-recent-first, tolerant of yfinance changing
+    its column order. Statement columns are period-end dates; sort by parsed date
+    descending so column 0 is reliably the latest period and column 1 the prior
+    year. If the labels aren't all date-like, trust the given order unchanged."""
+    try:
+        import pandas as pd
+        cols = list(df.columns)
+        if len(cols) < 2:
+            return df
+        parsed = [pd.to_datetime(c, errors="coerce") for c in cols]
+        if any(pd.isna(p) for p in parsed):
+            return df  # non-date labels — don't guess, keep as returned
+        order = sorted(range(len(cols)), key=lambda i: parsed[i], reverse=True)
+        if order == list(range(len(cols))):
+            return df  # already latest-first
+        return df.iloc[:, order]
+    except Exception:
+        return df
+
+
 def _first(df, keys):
     """Return the most recent value for the first matching row label in a yfinance
-    statement DataFrame, or None. Tolerant of label/format variation."""
+    statement DataFrame, or None. Tolerant of label/format variation. Assumes
+    columns are latest-first (see `_order_latest_first`)."""
     if df is None:
         return None
     try:
@@ -154,9 +176,9 @@ def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
         except Exception:
             info = {}
 
-        income = _safe_stmt(t, "income_stmt")
-        cash = _safe_stmt(t, "cashflow")
-        balance = _safe_stmt(t, "balance_sheet")
+        income = _order_latest_first(_safe_stmt(t, "income_stmt"))
+        cash = _order_latest_first(_safe_stmt(t, "cashflow"))
+        balance = _order_latest_first(_safe_stmt(t, "balance_sheet"))
 
         capex_raw = _first(cash, ["Capital Expenditure", "CapitalExpenditures"])
         f = Fundamentals(
