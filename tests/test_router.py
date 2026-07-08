@@ -50,6 +50,24 @@ class TestResolve(unittest.TestCase):
         self.assertFalse(router.resolve("   ").resolved)
 
 
+class TestTickerExtraction(unittest.TestCase):
+    def test_explicit_symbol_in_question(self):
+        self.assertEqual(router.extract_tickers("Do you think NBIS is a buy?"), ["NBIS"])
+
+    def test_dollar_prefixed(self):
+        self.assertEqual(router.extract_tickers("is $nvda overvalued"), ["NVDA"])
+
+    def test_company_name_maps(self):
+        self.assertIn("NVDA", router.extract_tickers("is nvidia a good buy?"))
+
+    def test_ignores_jargon_words(self):
+        # "AI", "GPU", "DCF" etc. must not be mistaken for tickers.
+        self.assertEqual(router.extract_tickers("what is the AI GPU DCF story"), [])
+
+    def test_multiple_tickers_first_seen_order(self):
+        self.assertEqual(router.extract_tickers("compare AMD and NVDA"), ["AMD", "NVDA"])
+
+
 class TestHelp(unittest.TestCase):
     def test_help_groups_by_question(self):
         text = router.format_help()

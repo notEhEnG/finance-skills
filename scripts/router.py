@@ -11,6 +11,7 @@ question, not alphabetically), shared between the CLI and SKILL.md.
 
 from __future__ import annotations
 
+import re
 import sys
 from dataclasses import dataclass
 from difflib import get_close_matches
@@ -99,6 +100,63 @@ def resolve(raw: str, fuzzy_cutoff: float = 0.72) -> Resolution:
     return Resolution(raw, None, "unknown", hints or TOP_VERBS.copy())
 
 
+# --- Ticker extraction (front-door helper) --------------------------------
+# The agent should also map company names it knows (Nvidia -> NVDA); this helper
+# reliably catches explicit symbols in a free-text question like
+# "Do you think NBIS is a buy?".
+
+_COMMON_NAMES = {
+    "nvidia": "NVDA", "amd": "AMD", "apple": "AAPL", "microsoft": "MSFT",
+    "nebius": "NBIS", "coreweave": "CRWV", "palantir": "PLTR", "micron": "MU",
+    "tesla": "TSLA", "meta": "META", "amazon": "AMZN", "google": "GOOGL",
+    "alphabet": "GOOGL", "broadcom": "AVGO", "netflix": "NFLX", "snowflake": "SNOW",
+}
+
+# All-caps words that are NOT tickers (finance jargon / English).
+_TICKER_STOPWORDS = {
+    "A", "I", "AI", "AN", "AT", "BE", "BY", "DO", "GO", "IF", "IN", "IS", "IT",
+    "ME", "MY", "NO", "OF", "ON", "OR", "SO", "TO", "UP", "US", "USA", "WE",
+    "CEO", "CFO", "EPS", "FCF", "PE", "PEG", "ROE", "ROA", "ROIC", "GPU", "CPU",
+    "ETF", "IPO", "YOY", "TTM", "DCF", "EV", "EBITDA", "SAAS", "ARR", "RPO",
+    "Q1", "Q2", "Q3", "Q4", "YOLO", "OK", "VS", "AND", "THE", "FOR", "BUY",
+}
+
+_EXPLICIT_TICKER_RE = re.compile(r"\$([A-Za-z]{1,5})\b")
+_BARE_UPPER_RE = re.compile(r"\b([A-Z]{1,5})\b")
+
+
+def extract_tickers(text: str) -> list[str]:
+    """Best-effort ticker extraction from a free-text question.
+
+    Order of preference: $-prefixed symbols, then known company names, then
+    bare uppercase tokens that aren't jargon. Returns de-duplicated symbols in
+    first-seen order. The agent should still resolve names it recognises.
+    """
+    found: list[str] = []
+
+    def add(sym: str):
+        sym = sym.upper()
+        if sym and sym not in found:
+            found.append(sym)
+
+    for m in _EXPLICIT_TICKER_RE.finditer(text):
+        add(m.group(1))
+
+    lowered = text.lower()
+    for name, sym in _COMMON_NAMES.items():
+        if re.search(rf"\b{re.escape(name)}\b", lowered):
+            add(sym)
+
+    # Also scan bare uppercase tokens (stopword-filtered) and merge — a strong
+    # match elsewhere shouldn't hide a second symbol like "compare AMD and NVDA".
+    for m in _BARE_UPPER_RE.finditer(text):
+        tok = m.group(1)
+        if tok not in _TICKER_STOPWORDS and len(tok) >= 2:
+            add(tok)
+
+    return found
+
+
 def format_help() -> str:
     lines = [
         "financial-skills — ask in plain English, or use a verb.",
@@ -122,6 +180,10 @@ def main(argv: list[str]) -> int:
     if not argv or argv[0].lower() in ("help", "-h", "--help"):
         print(format_help())
         return 0
+    if argv[0].lower() == "tickers":
+        tickers = extract_tickers(" ".join(argv[1:]))
+        print(" ".join(tickers) if tickers else "(no ticker found)")
+        return 0 if tickers else 1
     res = resolve(argv[0])
     if res.method == "exact":
         print(f"{res.input} → {res.command}")
