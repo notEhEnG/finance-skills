@@ -1,0 +1,2 @@
+# Live data fetching (Claude Code / local; not the Claude.ai sandbox).
+yfinance>=0.2

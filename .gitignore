@@ -1,0 +1,16 @@
+# Planning / scratch notes — not part of the shipped skill
+overview.md
+overview-2.md
+financial-skills-cli.txt
+Gap-Whatcompetitorsdo-Whatyoushouldadd.csv
+*.draft.md
+
+# Local data cache (best-effort, regenerated on demand)
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
