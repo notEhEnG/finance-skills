@@ -24,17 +24,18 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 if __package__:
-    from finance_skills import analyze, rank
+    from finance_skills import analyze
     from finance_skills import compare as compare_mod
     from finance_skills.cli import flag_value, parse_argv
     from finance_skills.data import CACHE_DIR, load_for_cli
+    from finance_skills.format import markdown_table
     from finance_skills.router import WATCHLIST_VERBS, load_builder
 else:
     import analyze
     import compare as compare_mod
-    import rank
     from cli import flag_value, parse_argv
     from data import CACHE_DIR, load_for_cli
+    from format import markdown_table
     from router import WATCHLIST_VERBS, load_builder
 
 STORE = CACHE_DIR / "watchlists.json"
@@ -99,8 +100,14 @@ def main(argv: list[str]) -> int:
         if not data:
             print("(no watchlists yet — add one: watchlist.py add NVDA AMD)")
             return 0
-        for key, tickers in data.items():
-            print(f"[{key}] {', '.join(tickers) or '(empty)'}")
+        rows = []
+        for key, tks in data.items():
+            rows.append([f"**{key}**", str(len(tks)), ", ".join(tks) or "*(empty)*"])
+        print(markdown_table(
+            ["List", "n", "Tickers"],
+            rows,
+            aligns=["left", "center", "left"],
+        ))
         return 0
 
     if cmd == "run":
@@ -116,16 +123,15 @@ def main(argv: list[str]) -> int:
                 rep = analyze.build_report(load_for_cli(t, use_fixture=use_fixture))
                 if rep.get("available", True):
                     reports.append(rep)
-            if verb == "rank":
-                if not reports:
-                    print("No tickers with data to rank.", file=sys.stderr)
-                    return 1
-                ranking = rank.rank_reports(reports)
-                print("\n".join(rank.render_ranking(ranking)))
-                print(f"\n[{name}] {', '.join(r['ticker'] for r in reports)}")
-                return 0
+            if not reports:
+                print("No tickers with data.", file=sys.stderr)
+                return 1
+            # rank and compare both get the full comparison table (leaders + markdown)
             if len(reports) < 2:
-                print("Need at least two tickers with data to compare.", file=sys.stderr)
+                print(
+                    "Need at least two tickers with data for a comparison table.",
+                    file=sys.stderr,
+                )
                 return 1
             print(compare_mod.build_compare(reports, as_json=False))
             return 0
@@ -140,12 +146,18 @@ def main(argv: list[str]) -> int:
         reports = []
         for t in tickers:
             f = load_for_cli(t, use_fixture=use_fixture)
-            print(build(f, False))
-            print()
             if f.available:
                 reports.append(analyze.build_report(f))
+        # Side-by-side comparison table first when ≥2 names (visibility)
         if len(reports) >= 2:
-            print("\n".join(rank.render_ranking(rank.rank_reports(reports))))
+            print(f"═══ [{name}] side-by-side ({verb}) ═══\n")
+            print(compare_mod.build_compare(reports, as_json=False))
+            print("\n" + "═" * 60)
+            print(f"Per-ticker `{verb}` detail\n")
+        for t in tickers:
+            f = load_for_cli(t, use_fixture=use_fixture)
+            print(build(f, False))
+            print()
         return 0
 
     print(f"unknown command {cmd!r}. Use add / remove / list / clear / run.", file=sys.stderr)

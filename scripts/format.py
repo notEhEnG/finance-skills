@@ -84,3 +84,38 @@ def render_metric_table(
     if with_footer:
         out += ["", *footer()]
     return "\n".join(out)
+
+
+def markdown_table(
+    headers: list[str],
+    rows: list[list[str]],
+    *,
+    aligns: list[str] | None = None,
+) -> str:
+    """GitHub-flavored markdown table for multi-ticker / comparison views.
+
+    `aligns` entries: 'left' | 'center' | 'right' (default: first left, rest center).
+    """
+    if not headers:
+        return ""
+    n = len(headers)
+    if aligns is None:
+        aligns = ["left"] + ["center"] * (n - 1)
+    while len(aligns) < n:
+        aligns.append("center")
+
+    def _sep(a: str) -> str:
+        if a == "right":
+            return "---:"
+        if a == "center":
+            return ":---:"
+        return ":---"
+
+    # Bold header cells for visibility
+    head = "| " + " | ".join(f"**{h}**" for h in headers) + " |"
+    rule = "| " + " | ".join(_sep(aligns[i]) for i in range(n)) + " |"
+    body = []
+    for row in rows:
+        cells = list(row) + [""] * (n - len(row))
+        body.append("| " + " | ".join(str(c) for c in cells[:n]) + " |")
+    return "\n".join([head, rule, *body])

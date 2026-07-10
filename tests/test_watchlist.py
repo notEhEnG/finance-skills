@@ -58,6 +58,30 @@ class TestWatchlist(unittest.TestCase):
         rc, out = _run(["run", "compare", "--name=neo", "--fixture"])
         self.assertEqual(rc, 0)
         self.assertIn("Compare", out)
+        self.assertIn("| **Metric** |", out)
+        self.assertIn("🏆", out)
+
+    def test_run_rank_is_comparison_table(self):
+        _run(["add", "CRWV", "NBIS", "--name=neo"])
+        rc, out = _run(["run", "rank", "--name=neo", "--fixture"])
+        self.assertEqual(rc, 0)
+        self.assertIn("| **Metric** |", out)
+        self.assertIn("🏆", out)
+
+    def test_run_valuation_leads_with_side_by_side_table(self):
+        _run(["add", "CRWV", "NBIS", "--name=neo"])
+        rc, out = _run(["run", "valuation", "--name=neo", "--fixture"])
+        self.assertEqual(rc, 0)
+        self.assertIn("side-by-side", out)
+        self.assertIn("| **Metric** |", out)
+        self.assertIn("🏆", out)
+
+    def test_list_is_table(self):
+        _run(["add", "CRWV", "NBIS", "--name=neo"])
+        rc, out = _run(["list"])
+        self.assertEqual(rc, 0)
+        self.assertIn("| **List** |", out)
+        self.assertIn("CRWV", out)
 
     def test_run_empty_list_errors(self):
         rc, _ = _run(["run", "valuation", "--name=empty", "--fixture"])

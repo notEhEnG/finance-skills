@@ -85,6 +85,18 @@ class TestScreen(unittest.TestCase):
         res = screen.screen("gross_margin > 0", ["ZZZZ"], use_fixture=True)
         self.assertIsNone(res["results"][0]["passes"])
 
+    def test_markdown_table_pass_fail_and_leaders(self):
+        res = screen.screen("gross_margin > 50", ["CRWV", "NBIS"], use_fixture=True)
+        md = res["markdown_table"]
+        self.assertIn("| **Ticker** |", md)
+        self.assertIn("✅ **PASS**", md)
+        self.assertIn("❌ FAIL", md)
+        self.assertIn("🏆", md)
+        text = screen._render(res)
+        self.assertIn("| **Ticker** |", text)
+        self.assertIn("PASS", text)
+
 
 if __name__ == "__main__":
     unittest.main()
+
