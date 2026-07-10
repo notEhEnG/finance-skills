@@ -41,12 +41,22 @@ class TestStyle(unittest.TestCase):
         self.assertEqual(b["style"], "risk")
         self.assertTrue(b["redflags"] or b["disabled"] is not None)
 
+    def test_all_style_focus_paths(self):
+        f = load_fixture("NBIS")
+        payload = brief.build_brief(f, as_json=True)
+        for name in style.STYLES:
+            lines = style.style_focus(name, payload)
+            self.assertTrue(lines, name)
+            self.assertIn("Emphasis", lines[0])
+
     def test_brief_explain_flag(self):
         f = load_fixture("CRWV")
         b = brief.build_brief(f, as_json=True, flags={"--explain"})
         self.assertTrue(b["why"])
         text = brief.build_brief(f, as_json=False, flags={"--explain"})
         self.assertIn("Why this matters", text)
+        self.assertIn("Disabled analyses", text)
+        self.assertIn("Filing verification", text)
 
 
 class TestDiagnostics(unittest.TestCase):
@@ -64,11 +74,25 @@ class TestDiagnostics(unittest.TestCase):
         disabled = diagnostics.disabled_analyses(f, r)
         dcf = next(d for d in disabled if d["analysis"] == "dcf")
         self.assertIn("shares outstanding", dcf["missing_inputs"])
+        text = "\n".join(diagnostics.render_disabled(disabled))
+        self.assertIn("Disabled analyses", text)
+        self.assertIn("shares outstanding", text)
 
     def test_dcf_names_non_positive_fcf(self):
         f = load_fixture("CRWV")
         r = analyze.build_report(f)
         self.assertIn("not positive", r["dcf_note"])
+
+    def test_sparse_fundamentals_disable_many(self):
+        f = Fundamentals(ticker="SPARSE", available=True, source="fixture")
+        r = analyze.build_report(f)
+        disabled = diagnostics.disabled_analyses(f, r)
+        names = {d["analysis"] for d in disabled}
+        self.assertIn("rule40", names)
+        self.assertIn("dcf", names)
+        self.assertIn("revenue_growth", names)
+        lines = diagnostics.render_filing_checklist(diagnostics.filing_checklist())
+        self.assertTrue(any("revenue" in ln for ln in lines))
 
     def test_filing_checklist_present_on_brief(self):
         b = brief.build_brief(load_fixture("NBIS"), as_json=True)
@@ -86,7 +110,7 @@ class TestScenarios(unittest.TestCase):
             revenue=300e6, revenue_prior=100e6,
             ebitda=60e6, free_cash_flow=40e6,
             shares_outstanding=10e6, total_cash=0.0, total_debt=0.0,
-            price=50.0,
+            price=50.0, market_cap=500e6,
         )
         r = analyze.build_report(f)
         self.assertIn("dcf", r)
@@ -98,6 +122,16 @@ class TestScenarios(unittest.TestCase):
         self.assertGreaterEqual(sc["growth"]["bull"]["growth_rate"], sc["growth"]["base"]["growth_rate"])
         self.assertEqual(len(sc["discount_rate"]), 3)
         self.assertEqual(len(sc["fcf_conversion"]), 3)
+        text = analyze.format_report(r)
+        self.assertIn("Scenarios", text)
+        self.assertIn("bear", text)
+
+        import valuation
+        vtext = valuation.build_valuation(f, as_json=False, flags={"--explain"})
+        self.assertIn("Scenarios", vtext)
+        self.assertIn("Why this matters", vtext)
+        vjson = valuation.build_valuation(f, as_json=True, flags={"--explain"})
+        self.assertIn("dcf_scenarios", vjson)
 
     def test_pure_helper_monotonic_in_growth(self):
         a = metrics.dcf_scenarios(1e9, 10.0, 1e8, 0.0, price=20.0)
@@ -138,6 +172,19 @@ class TestPeersAndRank(unittest.TestCase):
         # compare the two that load under --fixture.
         code = compare.main(["--preset=ai-infra", "--fixture", "--json"])
         self.assertEqual(code, 0)
+
+    def test_screen_includes_ranking(self):
+        import screen
+        res = screen.screen("growth > 0", ["CRWV", "NBIS"], use_fixture=True)
+        self.assertIn("ranking", res)
+        self.assertGreaterEqual(res["ranking"]["n"], 2)
+        text = screen._render(res)
+        self.assertIn("Ranking summary", text)
+
+    def test_peers_aliases(self):
+        self.assertIsNotNone(peers.resolve_preset("neocloud"))
+        self.assertIsNotNone(peers.resolve_preset("faang"))
+        self.assertIsNone(peers.resolve_preset("not-a-real-preset"))
 
 
 if __name__ == "__main__":

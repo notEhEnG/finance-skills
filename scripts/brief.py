@@ -46,11 +46,12 @@ def _gaps(r: dict) -> list[dict[str, str]]:
     """Fail-closed guided gaps from disabled diagnostics + neocloud extras."""
     gaps: list[dict[str, str]] = []
     for d in r.get("disabled") or []:
+        miss = ", ".join(d.get("missing_inputs") or [])
         gaps.append({
             "field": d["analysis"],
             "why": d["reason"],
             "unlocks": d["unlocks"],
-            "missing_inputs": ", ".join(d.get("missing_inputs") or []) or None,
+            "missing_inputs": miss,
         })
     rule = r.get("rule40") or {}
     if rule.get("regime") in ("ai_neocloud", "hypergrowth"):
