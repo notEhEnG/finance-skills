@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-11
+
+### Changed
+- **README rewrite** — focused landing page: one hero path, compact command table,
+  single fixture example (brief/CRWV), short architecture. Removed outdated multi-page
+  dumps, ghost-verb help sample, and per-test inventory (details stay in `SKILL.md` /
+  `CHANGELOG`).
+
 ## [0.5.0] - 2026-07-11
 
 ### Added
