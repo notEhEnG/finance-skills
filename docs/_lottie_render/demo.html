@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>finance-skills demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 960px; height: 540px;
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    overflow: hidden;
+  }
+  .stage { position: relative; width: 960px; height: 540px; }
+  .scene {
+    position: absolute; inset: 0;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+    padding: 36px 44px;
+  }
+  .scene.on { opacity: 1; transform: translateY(0); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
+    color: #8b949e; margin-bottom: 18px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; }
+  h1 { font-size: 28px; font-weight: 650; line-height: 1.25; margin-bottom: 10px; }
+  .sub { color: #8b949e; font-size: 16px; line-height: 1.45; max-width: 720px; }
+  .term {
+    margin-top: 22px;
+    background: #010409;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 18px 20px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 15px;
+    line-height: 1.55;
+    min-height: 220px;
+  }
+  .prompt { color: #79c0ff; }
+  .ok { color: #3fb950; }
+  .warn { color: #d29922; }
+  .bad { color: #f85149; }
+  .muted { color: #8b949e; }
+  .grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 22px;
+  }
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .card .k { font-size: 12px; color: #8b949e; margin-bottom: 8px; }
+  .card .v { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .card .n { font-size: 13px; color: #8b949e; margin-top: 6px; }
+  .pill {
+    display: inline-block; margin-top: 14px;
+    padding: 6px 12px; border-radius: 999px;
+    background: #21262d; color: #e6edf3; font-size: 13px;
+    border: 1px solid #30363d;
+  }
+  .pill.good { border-color: #238636; color: #3fb950; }
+  .pill.warn { border-color: #9e6a03; color: #d29922; }
+  .footer {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 12px 44px;
+    border-top: 1px solid #21262d;
+    color: #6e7681; font-size: 12px;
+    background: #0d1117;
+  }
+  .type { border-right: 2px solid #79c0ff; padding-right: 2px; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="scene" id="s0">
+    <div class="badge"><span class="dot"></span> finance-skills · agent skill</div>
+    <h1>Stop AI agents from inventing stock numbers.</h1>
+    <p class="sub">Deterministic route → engine report → bounded answer. Real fundamentals. Fail-closed when data is missing.</p>
+    <div class="term" id="t0"></div>
+  </div>
+  <div class="scene" id="s1">
+    <div class="badge"><span class="dot"></span> engine report · fixture sample</div>
+    <h1>CRWV — not a buy call. Evidence only.</h1>
+    <p class="sub">Same numbers in brief / valuation / redflags. DCF refused when FCF is not positive.</p>
+    <div class="grid">
+      <div class="card"><div class="k">Rule of 40 (preferred)</div><div class="v bad">−668</div><div class="n">vs bar 38 · BELOW</div></div>
+      <div class="card"><div class="k">EV / Sales</div><div class="v">31.3×</div><div class="n">growth-priced</div></div>
+      <div class="card"><div class="k">FCF margin</div><div class="v bad">−316%</div><div class="n">cash burn</div></div>
+    </div>
+    <span class="pill warn">DCF disabled · FCF not positive</span>
+    <span class="pill">SAMPLE DATA — not live</span>
+  </div>
+  <div class="scene" id="s2">
+    <div class="badge"><span class="dot"></span> agent answer policy</div>
+    <h1>Bounded interpretation. No recommendation.</h1>
+    <div class="term" style="min-height: 260px">
+      <div class="warn">Sample/fixture data — not live market prices.</div>
+      <div style="margin-top:10px">On available engine inputs, growth is high but free cash flow is deeply negative; preferred Rule of 40 sits far below its bar. <span class="bad">DCF is disabled</span> (FCF not positive), so there is no engine intrinsic value.</div>
+      <div style="margin-top:10px" class="ok">This is research only — not a buy or sell recommendation.</div>
+      <div style="margin-top:10px" class="muted">Verify revenue, FCF, debt, cash, shares in 10-K/10-Q. yfinance can be incomplete.</div>
+    </div>
+  </div>
+  <div class="footer">finance-skills · Claude Code / Codex / Cursor agents · not investment advice · github.com/notEhEnG/finance-skills</div>
+</div>
+<script>
+  const scenes = [document.getElementById('s0'), document.getElementById('s1'), document.getElementById('s2')];
+  const t0 = document.getElementById('t0');
+  const lines = [
+    { html: '<span class="prompt">$</span> /finance-skills is CRWV a buy?', delay: 0 },
+    { html: '<span class="muted">→ route --json</span>', delay: 500 },
+    { html: '  intent: <span class="ok">valuation</span>  tickers: ["CRWV"]', delay: 900 },
+    { html: '  action: run engine <span class="muted">(not model memory)</span>', delay: 1300 },
+    { html: '<span class="muted">→ brief CRWV --fixture --json</span>', delay: 1700 },
+    { html: '  <span class="warn">source: fixture · SAMPLE — not live</span>', delay: 2100 },
+  ];
+  let started = 0;
+  function showScene(i) {
+    scenes.forEach((s, idx) => s.classList.toggle('on', idx === i));
+  }
+  function typeLines(now) {
+    if (!started) started = now;
+    const t = now - started;
+    let html = '';
+    for (const line of lines) {
+      if (t >= line.delay) html += line.html + '<br/>';
+    }
+    t0.innerHTML = html + (t < 4200 ? '<span class="type"></span>' : '');
+  }
+  // Timeline (ms): scene0 0-3000, scene1 3000-6000, scene2 6000-9000, loop
+  function frame(now) {
+    const cycle = 9000;
+    const t = now % cycle;
+    if (t < 3000) {
+      showScene(0);
+      if (t < 80) { started = now; }
+      typeLines(now);
+    } else if (t < 6000) {
+      showScene(1);
+    } else {
+      showScene(2);
+    }
+    requestAnimationFrame(frame);
+  }
+  showScene(0);
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>
