@@ -40,14 +40,16 @@ curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/main/instal
 ## Agent interaction (contract)
 
 1. **User:** “Is CRWV a buy?”  
-2. **Agent must run:**  
-   `python3 scripts/router.py route --json "Is CRWV a buy?"`  
-   then `python3 scripts/valuation.py CRWV --fixture --json` (or `brief`)  
-3. **Engine:** structured report + `engine_report` (disabled DCF, fixture flag, prohibited claims)  
-4. **Agent:** 3–6 sentence **bounded** interpretation — no buy/sell; limitations first  
-5. **Agent:** filing checklist + not investment advice  
+2. **Agent runs one command:**  
+   `python3 scripts/ask.py --json "Is CRWV a buy?"` (add `--fixture` for sample data)  
+3. **Engine returns** `answer_draft` + full `report` (disabled DCF, fixture flag, evidence)  
+4. **Agent sends `answer_draft` to the user** and **stops scripting** (`stop_tool_loop`)  
+5. No buy/sell recommendation; numbers only from the draft/report  
 
-**Hard gate:** if `route --json` + engine `--json` did not run this turn for an in-scope company question, **do not state financial numbers.**
+**Hard gate:** if `ask` (or legacy `route --json` + engine `--json`) did not run this turn for an in-scope company question, **do not state financial numbers.**
+
+**Anti-pattern:** chaining five Python scripts and dumping JSON.  
+**Success:** one `ask` → user-visible analysis.
 
 Full policy: [`SKILL.md`](SKILL.md) · templates: [`docs/agent-policy.md`](docs/agent-policy.md) · eval: [`docs/eval.md`](docs/eval.md)
 

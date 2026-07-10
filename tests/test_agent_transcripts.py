@@ -85,6 +85,19 @@ class TestTranscriptHardFails(unittest.TestCase):
     def test_route_refuse(self):
         self.assertEqual(router.route_request("Should I sell everything?").intent, "refuse")
 
+    def test_ask_draft_passes_hard_and_useful(self):
+        import ask
+
+        out = ask.run_ask("Is CRWV a buy?", use_fixture=True)
+        draft = out["answer_draft"]
+        fails = agent_eval.hard_fail_checks(
+            draft, report=out.get("report"), expect_fixture=True, expect_dcf_disabled=True
+        )
+        self.assertEqual(fails, [], fails)
+        soft = agent_eval.usefulness_checks(draft, intent=out["intent"], status=out["status"])
+        self.assertEqual(soft, [], soft)
+        self.assertTrue(out.get("stop_tool_loop"))
+
 
 class TestEngineReportOnAllVerbs(unittest.TestCase):
     def test_valuation_redflags_health_company_analyze(self):

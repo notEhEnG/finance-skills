@@ -598,6 +598,10 @@ def format_help() -> str:
     lines = [
         "finance-skills — ask in plain English, or use a Core verb.",
         "",
+        "Preferred (agents):  finance-skills ask \"<question>\" [--fixture] [--json]",
+        "  → route + engine + answer_draft (send answer_draft to the user; stop scripting).",
+        "Diagnostics:         finance-skills doctor [--json]",
+        "",
         "Top verbs:  " + "  ".join(TOP_VERBS),
         f"Default (no verb / bare ticker):  {DEFAULT_VERB}",
         "",
@@ -612,9 +616,10 @@ def format_help() -> str:
         lines.append(f"  {question.ljust(width)}  →  {', '.join(cmds)}")
     lines += [
         "",
-        "CLI: finance-skills <verb> <TICKER> [--fixture|--json]",
+        "CLI: finance-skills ask \"is NBIS a buy?\" --fixture",
+        "     finance-skills <verb> <TICKER> [--fixture|--json]",
         "     finance-skills NBIS --fixture          # same as brief",
-        "     finance-skills semiconductor CRWV --fixture  # → framework neocloud? semiconductor",
+        "     finance-skills semiconductor CRWV --fixture  # → framework semiconductor",
         "Sector words → framework <name>. Legacy: r40/rule40/growth→brief, dcf→valuation, risk→redflags.",
         "Shorthand: val→valuation, comp→compare, snap→brief, semis→framework semiconductor.",
     ]
@@ -681,6 +686,11 @@ def main(argv: list[str]) -> int:
         return 0
 
     head = argv[0].lower()
+
+    # Preferred agent path: one-shot route → engine → answer_draft
+    if head in ("ask", "doctor"):
+        ask_mod = _load_module("ask")
+        return int(ask_mod.main(argv if head == "doctor" else argv[1:]))
 
     if head == "tickers":
         tickers = extract_tickers(" ".join(argv[1:]))

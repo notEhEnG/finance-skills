@@ -6,6 +6,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-11
+
+### Added
+- **`ask` one-shot path** (`scripts/ask.py`, `finance-skills ask "…"`): route → engine → **`answer_draft`**.
+- **`answer_draft` builder** (`scripts/answer_draft.py`) — deterministic user-facing analysis so agents stop dumping JSON.
+- **`doctor`** — version mismatch (skill scripts vs site-packages), yfinance, fixture smoke.
+- **Usefulness checks** in `agent_eval` (empty / caveat-wall answers fail soft quality).
+- SKILL.md **happy path**: one command, `stop_tool_loop`, send draft.
+
+### Changed
+- Agent contract prioritizes **answering the user** over multi-script ceremony.
+- Help text advertises `ask` / `doctor` first.
+
+### Fixed
+- Lowercase tickers in NL (`is nbis a buy?`) route without false clarification (0.6.x follow-on).
+
 ## [0.6.0] - 2026-07-11
 
 ### Added

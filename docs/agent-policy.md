@@ -3,10 +3,23 @@
 Executable companion to [`SKILL.md`](../SKILL.md). Agents must follow this when
 composing user-visible answers after routing / engine runs.
 
+## Preferred path: `ask` → send `answer_draft`
+
+```bash
+python3 scripts/ask.py --json "<user question>"   # add --fixture for sample data
+```
+
+The JSON includes **`answer_draft`** (user-facing), **`stop_tool_loop`: true**, and
+**`next_action`: `respond_with_answer_draft`**.
+
+**Success looks like:** one tool call → paste/polish `answer_draft` → stop.  
+**Failure looks like:** five script calls, raw JSON dump, or only “not investment advice”
+with no valuation/risk content.
+
 ## Hard gate
 
-**No `route --json` + engine `--json` this turn ⇒ no financial numbers in the answer.**  
-Repeat: skip-tools / quick-take / from-knowledge still require both steps for in-scope company questions.
+**No `ask` (or `route --json` + engine `--json`) this turn ⇒ no financial numbers.**  
+Skip-tools / quick-take / from-knowledge still require the skill for in-scope company questions.
 
 ## Claim vocabulary
 

@@ -48,10 +48,14 @@ We publish **expected skill-side outcomes** (deterministic). Bare-model column i
 ## Skill-side smoke (deterministic — run in CI)
 
 ```bash
-python -m pytest tests/test_agent_transcripts.py tests/test_route_request.py -q
+python -m pytest tests/test_agent_transcripts.py tests/test_route_request.py tests/test_ask.py -q
+python scripts/ask.py --json "Is CRWV a buy?" --fixture   # answer_draft present
 python scripts/router.py route --json "Is CRWV a buy?"
 python scripts/brief.py CRWV --fixture --json   # engine_report present
 ```
+
+**Usefulness:** `answer_draft` must pass `agent_eval.usefulness_checks` (not only hard-fails).
+Empty caveat walls and pure JSON dumps fail the skill product even if they are “safe.”
 
 ## How to re-score bare vs skill on your model
 

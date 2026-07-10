@@ -52,6 +52,14 @@ class TestConsoleEntry(unittest.TestCase):
         self.assertIn("brief", text.lower())
         self.assertIn("NBIS", text)
 
+    def test_ask_via_entry(self):
+        code, text = self._run("ask", "is nbis a buy?", "--fixture")
+        self.assertEqual(code, 0)
+        self.assertIn("Sample/fixture", text)
+        self.assertRegex(text, r"(?i)ev|dcf|valuation|sales")
+        # User-facing draft, not raw multi-script JSON
+        self.assertNotIn('"engine_report"', text)
+
 
 if __name__ == "__main__":
     unittest.main()

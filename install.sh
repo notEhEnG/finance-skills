@@ -70,15 +70,30 @@ else
   install_tool "$TOOL"
 fi
 
+# Record installed skill version for doctor / support (before temp clone cleanup)
+if [ -f "$SRC/scripts/__init__.py" ]; then
+  VER="$(grep -E '^__version__' "$SRC/scripts/__init__.py" | head -1 | cut -d'"' -f2 || true)"
+  echo "Skill package version: ${VER:-unknown}"
+fi
+
 [ -n "$CLEANUP" ] && rm -rf "$CLEANUP"
 
 cat <<'EOF'
 
 Done. If needed: pip install yfinance
-Trigger it with:
-  /finance-skills analyze Do you think NBIS is a buy?
+  (optional CLI) pip install -U finance-skills   # keep in sync with skill scripts
+
+Preferred agent command (one shot → answer_draft):
+  python3 scripts/ask.py --json "is NBIS a buy?"
+  python3 scripts/ask.py "is CRWV a buy?" --fixture
+
+Slash (agent should run ask, then send answer_draft to the user):
+  /finance-skills is NBIS a buy?
   /finance-skills is NVDA overvalued?
   /finance-skills compare AMD and NVDA
+
+Diagnose stale installs:
+  python3 scripts/ask.py doctor
 
 Or ask your agent: "install this skill https://github.com/notEhEnG/finance-skills"
 EOF

@@ -135,6 +135,86 @@ def hard_fail_checks(
     return fails
 
 
+def usefulness_checks(
+    answer: str,
+    *,
+    intent: str | None = None,
+    status: str | None = None,
+) -> list[str]:
+    """Soft fails: answer is safe but empty / non-solving (agent only scripted).
+
+    Empty list = useful enough for a skill-mediated reply.
+    """
+    fails: list[str] = []
+    text = (answer or "").strip()
+    if not text:
+        return ["empty_answer"]
+
+    if status in ("refuse", "clarify", "learn", "error"):
+        if len(text) < 40:
+            fails.append("too_short_for_status")
+        return fails
+
+    if len(text) < 120:
+        fails.append("too_short_for_company_analysis")
+
+    # Pure disclaimer / no substance
+    low = text.lower()
+    substance = any(
+        k in low
+        for k in (
+            "ev/",
+            "ev/sales",
+            "dcf",
+            "rule of 40",
+            "fcf",
+            "growth",
+            "flag",
+            "leverage",
+            "margin",
+            "multiple",
+            "runway",
+            "disabled",
+            "skipped",
+            "fixture",
+            "sample",
+            "compare",
+            "evidence",
+        )
+    )
+    if intent in (
+        "valuation",
+        "brief",
+        "redflags",
+        "health",
+        "company",
+        "compare",
+        "framework",
+        "analyze",
+    ):
+        if not substance:
+            fails.append("no_analytical_substance")
+        # Caveat wall: many NIA lines, no evidence markers
+        if low.count("not investment advice") >= 2 and "evidence" not in low and "ev" not in low:
+            fails.append("caveat_wall_without_evidence")
+
+    if intent == "valuation" and not re.search(
+        r"\b(dcf|ev\s*/?\s*sales|ev/sales|multiple|cheap|rich|expensive|screen)\b",
+        low,
+    ):
+        fails.append("valuation_missing_screen_language")
+
+    return fails
+
+
 def score_answer(answer: str, report: dict[str, Any] | None, **kwargs) -> dict[str, Any]:
     fails = hard_fail_checks(answer, report=report, **kwargs)
-    return {"pass": not fails, "hard_fails": fails}
+    intent = kwargs.get("intent")
+    status = kwargs.get("status")
+    useful = usefulness_checks(answer, intent=intent, status=status)
+    return {
+        "pass": not fails,
+        "hard_fails": fails,
+        "usefulness_fails": useful,
+        "useful": not useful,
+    }
