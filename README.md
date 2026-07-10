@@ -7,25 +7,122 @@
 
 **Stop AI agents from inventing stock numbers.**
 
-`finance-skills` is a skill your coding agent (Claude Code, Codex, Cursor, MCP-style tools) runs before it talks about a public company. It pulls **real fundamentals**, runs **deterministic** Rule of 40 / DCF / red-flag math, and **fails closed** when inputs are missing — so the model reasons over facts, not vibes.
+`finance-skills` is a **skill** your coding agent (Claude Code, Codex, Cursor, MCP-style tools) runs before it talks about a public company. It pulls **real fundamentals**, runs **deterministic** Rule of 40 / DCF / red-flag math, and **fails closed** when inputs are missing — so the model reasons over facts, not vibes.
+
+```text
+# Install the skill (Claude Code example)
+curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/main/install.sh | bash -s -- claude
+
+# Then in the agent:
+/finance-skills is CRWV a buy?
+/finance-skills brief NBIS
+/finance-skills compare AMD NVDA
+```
+
+<!-- TODO: 15–20s GIF — user types /finance-skills … → engine output → agent answer-first -->
+![demo](docs/demo.gif)
+
+---
+
+## Install (agent first)
+
+**1. Install as a skill** — primary path for Claude Code / Codex / Cursor-style agents:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/main/install.sh | bash -s -- claude
+# or:  bash -s -- antigravity | codex | all
+```
+
+| Tool | Skill path | Invoke |
+|------|------------|--------|
+| Claude Code | `.claude/skills/finance-skills/` | `/finance-skills …` |
+| Antigravity | `.antigravity/skills/finance-skills/` | `/finance-skills …` |
+| Codex-compatible | `<skill-dir>/finance-skills/` | `/finance-skills …` |
+
+The agent needs `python3` + network (for live data) or uses `--fixture` offline. If needed: `pip install yfinance`.
+
+**2. Optional CLI / library** (scripts, CI, non-agent hosts):
 
 ```bash
 pip install finance-skills
-# or: install as /finance-skills skill → see Install
-finance-skills brief CRWV --fixture
+finance-skills help
 ```
 
-<!-- TODO: record a 15–20s terminal GIF: agent asks "is CRWV a buy?" → skill runs → brief output -->
-![demo](docs/demo.gif)
+Live data: network + yfinance. Offline demos: fixtures (CRWV, NBIS). Full agent contract: [`SKILL.md`](SKILL.md).
+
+---
+
+## Slash commands
+
+Type **`/finance-skills`** then a question or a verb. Plain English is routed deterministically; no verb → **`brief`**.
+
+### Everyday (plain English)
+
+```text
+/finance-skills is NVDA overvalued?
+/finance-skills do you think NBIS is a buy?
+/finance-skills is PLTR a value trap?
+/finance-skills how does AMD compare to NVDA?
+/finance-skills rule of 40 for CRM
+/finance-skills tell me about SNOW
+/finance-skills what's the financial health of CRWV?
+```
+
+| Sounds like… | Routes to |
+|--------------|-----------|
+| cheap / buy / overvalued / DCF / worth | `valuation` |
+| value trap / red flags / too much debt / risky | `redflags` |
+| balance sheet / runway / solvency | `health` |
+| rule of 40 / quick take / growth rate | `brief` |
+| compare / vs / better than | `compare` |
+| walk me through / deep dive | `company` |
+| (nothing matched) | **`brief`** (default) |
+
+### Explicit verbs
+
+```text
+/finance-skills brief CRWV
+/finance-skills brief NBIS --style=risk --explain
+/finance-skills valuation AAPL
+/finance-skills redflags PLTR
+/finance-skills health CRWV
+/finance-skills company NVDA
+/finance-skills analyze NBIS
+/finance-skills framework neocloud CRWV
+/finance-skills framework saas CRM
+/finance-skills compare AMD NVDA
+/finance-skills compare --preset=ai-infra
+/finance-skills screen "growth > 50 and fcf_margin < 0" CRWV NBIS
+/finance-skills learn rule40
+/finance-skills help
+```
+
+| Slash form | Job |
+|------------|-----|
+| `/finance-skills brief <ticker>` | Default stack: regime, Rule 40, multiples, flags, gaps |
+| `/finance-skills valuation <ticker>` | Cheap or not — EV/S, EV/EBITDA, DCF + scenarios |
+| `/finance-skills redflags <ticker>` | What could go wrong |
+| `/finance-skills health <ticker>` | Leverage, burn, runway |
+| `/finance-skills company <ticker>` | 9-stage walkthrough |
+| `/finance-skills analyze <ticker>` | Dense full dump |
+| `/finance-skills framework <saas\|neocloud\|semiconductor> <ticker>` | Sector checklist (honest on missing KPIs) |
+| `/finance-skills compare <a> <b> …` | Side-by-side (+ peer presets) |
+| `/finance-skills screen "rule" …` | Filter tickers |
+| `/finance-skills learn <concept>` | Offline explainer (no ticker) |
+| `/finance-skills moat <ticker>` | **Lens** — qualitative; engine numbers as evidence only |
+
+Aliases still work inside the skill: `val`→valuation, `risk`→redflags, `r40`→brief, `dcf`→valuation, `semis`→framework semiconductor.
+
+**After every Core run**, the agent should answer-first in 3–6 sentences using **only** engine figures, then show the table, then not-advice + gaps. Prefer `--json` on `brief` when composing.
 
 ---
 
 ## Real output
 
-Offline sample (`--fixture`). Live runs use yfinance + the same engine.
+What the skill’s engine prints (offline fixture). The agent wraps this in prose.
 
 ```text
-$ finance-skills brief CRWV --fixture
+/finance-skills brief CRWV
 
 ═══ CoreWeave, Inc. (CRWV) — brief ═══
 Source: fixture · as of 2026-Q1  [SAMPLE DATA — not live]
@@ -52,7 +149,7 @@ Filing verification checklist (before trusting this output)
   · free cash flow, debt, cash, share count, capex, backlog/RPO …
 ```
 
-Same numbers in `valuation`, `redflags`, `compare`, `screen` — one engine, many views.
+Same numbers if you had typed `/finance-skills valuation CRWV` or `/finance-skills redflags CRWV` — **one engine**, many views.
 
 ---
 
@@ -60,173 +157,106 @@ Same numbers in `valuation`, `redflags`, `compare`, `screen` — one engine, man
 
 LLMs are great at *language about finance* and terrible at *honest arithmetic under incomplete data*.
 
-They will:
+They invent EV/EBITDA when debt is missing, apply SaaS Rule of 40 to a GPU neocloud, and sound confident while compounding a bad assumption.
 
-- invent EV/EBITDA when debt is missing  
-- apply SaaS Rule of 40 to a GPU neocloud  
-- sound confident while compounding a bad assumption  
-
-Agents that trade time for money need a **financial reasoning layer** that:
+Agents need a **financial reasoning layer** that:
 
 1. Fetches real public data  
 2. Computes metrics offline and deterministically  
-3. Refuses to print a figure when inputs are incomplete (**fail-closed**)  
-4. Returns structured gaps so the agent can say what to check in the 10-K  
+3. **Fails closed** when inputs are incomplete  
+4. Returns gaps so the agent can say what to check in the 10-K  
 
-That layer is this repo. Read-only. Not investment advice. Verify filings.
-
----
-
-## vs ChatGPT (or any chat model alone)
-
-| | Chat model alone | + finance-skills |
-|--|------------------|------------------|
-| Numbers | Often invented or stale memory | From fetch + pure functions |
-| Missing data | Fills in zeros / “looks fine” | Skips analysis + names the missing field |
-| Rule of 40 | One flat 40 | Regime-aware (neocloud vs SaaS), dual margin |
-| Reproducibility | Temperature & mood | Same inputs → same report |
-| Agent contract | Prose blob | Tables + `--json` + gaps[] |
-
-Use the model for **judgment and prose**. Use this for **the numbers**.
+That layer is this skill. Read-only. Not investment advice. Verify filings.
 
 ---
 
-## vs “just give the agent MCP / yfinance”
+## vs ChatGPT alone
 
-| | Raw MCP / yfinance in the prompt | finance-skills |
-|--|----------------------------------|----------------|
-| What the agent gets | Tables, series, nulls | Analyst-shaped report |
-| Math | Model re-derives (and drifts) | One `build_report` path |
-| Consistency | Every tool call diverges | brief ≡ valuation ≡ redflags |
-| Safety | Easy to eval rules or over-fetch | Screen is a tiny parser; no eval; AST safety tests |
+| | Chat model alone | + `/finance-skills` |
+|--|------------------|---------------------|
+| Numbers | Invented or stale memory | Fetch + pure functions |
+| Missing data | “Looks fine” | Skips + names the missing field |
+| Rule of 40 | Flat 40 | Regime-aware (neocloud vs SaaS) |
+| Reproducibility | Mood | Same inputs → same report |
+
+Use the model for **judgment**. Use the skill for **the numbers**.
+
+---
+
+## vs raw MCP / yfinance in the prompt
+
+| | Raw MCP tables | This skill |
+|--|----------------|------------|
+| Agent gets | Series / nulls | Analyst-shaped report |
+| Math | Model re-derives (drifts) | One `build_report` |
+| Consistency | Diverges per call | brief ≡ valuation ≡ redflags |
 | Fail-closed | Optional | Default |
 
-MCP is a **pipe**. This is a **policy + engine** the agent is forced to go through.
+MCP is a **pipe**. This is **policy + engine** in front of the model.
 
 ---
 
 ## Features
 
-- **Agent skill** — `/finance-skills …` or CLI `finance-skills`  
-- **Plain English routing** — `is it a value trap?` → redflags; bare ticker → brief  
-- **Segment-aware Rule of 40** — capital-intensity gap; neocloud ≠ SaaS bar  
-- **Valuation** — EV/S, EV/EBITDA, DCF when allowed + bear/base/bull scenarios  
-- **Red flags / health** — burn, leverage, dilution, runway  
-- **Compare + peer presets** — `--preset=saas|ai-infra|semiconductor|megacap`  
-- **Screen / watchlist** — tiny rule language + ranking summary  
-- **`--style` / `--explain`** — value · growth · quality · risk emphasis  
-- **Fail-closed diagnostics** — disabled analyses + filing checklist  
-- **Offline fixtures** — CRWV / NBIS without network  
-- **CI-enforced safety** — one network module, no brokers, no eval ([`SECURITY.md`](SECURITY.md))
+- **Slash skill first** — `/finance-skills …` in Claude Code, Codex, Cursor-class tools  
+- **Plain-English routing** — deterministic keywords; default `brief`  
+- **Segment-aware Rule of 40** — capital-intensity gap  
+- **Valuation / redflags / health / company / framework**  
+- **Compare presets** — saas · ai-infra · semiconductor · megacap  
+- **Screen + watchlist + export + learn**  
+- **`--style` / `--explain`** on brief  
+- **Fail-closed diagnostics** + filing checklist  
+- **CI safety** — one network module, no brokers, no eval ([`SECURITY.md`](SECURITY.md))
 
 ---
 
 ## Architecture
 
 ```text
-agent (Claude Code / Codex / Cursor / …)
-        │
-        ▼
-  router  →  brief | valuation | redflags | compare | …
-        │
-        ▼
-  analyze.build_report   ← one structured report
-        │
-   ┌────┴────┐
-   ▼         ▼
- data.py   metrics.py
- (IO only) (pure, deterministic)
+you  →  /finance-skills …
+              │
+              ▼
+        agent skill (SKILL.md)
+              │
+              ▼
+     router → brief | valuation | redflags | …
+              │
+              ▼
+     analyze.build_report   ← one structured report
+         │            │
+      data.py      metrics.py
+      (IO only)    (pure, deterministic)
 ```
 
 Views never recompute. If two verbs disagree, that’s a bug.
 
 ---
 
-## Installation
+## CLI (optional)
 
-**CLI / library**
+Same engine if you’re not in an agent UI:
 
 ```bash
 pip install finance-skills
-finance-skills help
-```
-
-**As a skill** (Claude Code, Antigravity, Codex-style dirs)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/main/install.sh | bash -s -- claude
-# bash -s -- antigravity | codex | all
-```
-
-Live data: network + yfinance. Sandbox / offline: `--fixture`.
-
----
-
-## Quick start
-
-```bash
-finance-skills brief NVDA
-finance-skills NBIS --fixture
-finance-skills "is PLTR a value trap?"
-finance-skills valuation AAPL --json
-finance-skills compare --preset=ai-infra --fixture
-finance-skills brief CRWV --fixture --style=risk --explain
-```
-
-Agent path: `/finance-skills is NVDA overvalued?` → skill runs engine → answer-first prose using **only** engine figures.
-
-Full contract: [`SKILL.md`](SKILL.md)
-
----
-
-## Examples
-
-**Route a question (deterministic)**
-
-```bash
-$ finance-skills route "is NBIS a value trap?"
-redflags  [keyword]
-```
-
-**Valuation table**
-
-```bash
-finance-skills valuation CRWV --fixture
-```
-
-**Peer preset + ranking**
-
-```bash
-finance-skills compare --preset=ai-infra --fixture
-```
-
-**Teach a concept (no network)**
-
-```bash
-finance-skills learn rule40
+finance-skills brief CRWV --fixture
+finance-skills route "is NBIS a value trap?"   # → redflags
 ```
 
 ---
 
 ## FAQ
 
-**Is this investment advice?**  
-No. Research/education only. Verify primary filings.
+**Is this investment advice?** No. Verify primary filings.
 
-**Does it place trades?**  
-No. Read-only by architecture; CI fails if a broker SDK appears.
+**Does it place trades?** No. Read-only; CI fails on broker SDKs.
 
-**Why not let the model call yfinance itself?**  
-Because the model will still invent the *second* step (margins, DCF, “fine” leverage). The skill owns fetch + math + refusal.
+**Why not let the model call yfinance itself?** It still invents the *second* step (margins, DCF, “fine” leverage). The skill owns fetch + math + refusal.
 
-**What if data is missing?**  
-We skip the analysis and list exact missing inputs + what filing unlocks them. We do not impute net debt as 0.
+**Missing data?** Skip the analysis; list exact missing inputs + what unlocks them. No imputed net debt = 0.
 
-**Does it work offline?**  
-Yes — `--fixture` for CRWV/NBIS. Pure metrics are fully unit-tested offline.
+**Offline?** Yes — fixtures CRWV/NBIS; pure metrics unit-tested without network.
 
-**Python versions?**  
-3.10+
+**Python?** 3.10+
 
 ---
 
@@ -235,11 +265,10 @@ Yes — `--fixture` for CRWV/NBIS. Pure metrics are fully unit-tested offline.
 ```bash
 pip install -e ".[dev]"
 pytest tests/ -q --cov=scripts
-ruff check scripts tests
-mypy
+ruff check scripts tests && mypy
 ```
 
-PRs welcome. Prefer tests that lock fail-closed behavior. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Prefer tests that lock fail-closed behavior.
 
 ---
 
