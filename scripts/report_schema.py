@@ -296,17 +296,87 @@ def envelope_from_build_report(
     }
 
 
+_ENVELOPE_KEYS = (
+    "schema_version", "request", "company", "source", "source_facts",
+    "calculations", "flags", "disabled_analyses",
+    "filing_verification_checklist", "response_guidance",
+    "errors", "warnings",
+)
+
+
+def attach_engine_report(
+    view_payload: dict[str, Any],
+    report: dict[str, Any],
+    *,
+    fundamentals: Any | None = None,
+    route: dict[str, Any] | None = None,
+    invocation_mode: str = "agent",
+    disabled_raw: list[dict[str, Any]] | None = None,
+    flags_raw: list[dict[str, Any]] | None = None,
+    checklist: list[dict[str, Any]] | None = None,
+    intent: str | None = None,
+) -> dict[str, Any]:
+    """Attach canonical engine_report to any view JSON (brief, valuation, …)."""
+    route = dict(route or {})
+    if intent and not route.get("intent"):
+        route["intent"] = intent
+    envelope = envelope_from_build_report(
+        report,
+        fundamentals=fundamentals,
+        route=route or None,
+        invocation_mode=invocation_mode,
+        disabled_raw=disabled_raw,
+        flags_raw=flags_raw,
+        checklist=checklist,
+    )
+    out = dict(view_payload)
+    out["schema_version"] = envelope["schema_version"]
+    out["engine_report"] = {k: envelope[k] for k in _ENVELOPE_KEYS}
+    return out
+
+
 def project_brief_payload(envelope: dict[str, Any], legacy_brief: dict[str, Any]) -> dict[str, Any]:
     """Attach envelope keys onto a brief JSON payload for agents."""
     out = dict(legacy_brief)
     out["schema_version"] = envelope["schema_version"]
-    out["engine_report"] = {
-        k: envelope[k]
-        for k in (
-            "schema_version", "request", "company", "source", "source_facts",
-            "calculations", "flags", "disabled_analyses",
-            "filing_verification_checklist", "response_guidance",
-            "errors", "warnings",
-        )
-    }
+    out["engine_report"] = {k: envelope[k] for k in _ENVELOPE_KEYS}
     return out
+
+
+def enrich_report_for_agent(
+    f: Any,
+    report: dict[str, Any],
+    view_payload: dict[str, Any],
+    *,
+    intent: str,
+) -> dict[str, Any]:
+    """Shared path: diagnostics + flags + envelope on any available report."""
+    try:
+        if __package__:
+            from finance_skills import diagnostics, redflags
+        else:
+            import diagnostics
+            import redflags
+    except ImportError:
+        import diagnostics
+        import redflags
+
+    if not report.get("available", True):
+        return attach_engine_report(
+            view_payload if view_payload else report,
+            report,
+            fundamentals=f,
+            intent=intent,
+        )
+    disabled = diagnostics.disabled_analyses(f, report)
+    flags = redflags.flags_for(report)
+    checklist = diagnostics.filing_checklist({"disabled": disabled, "gaps": []})
+    return attach_engine_report(
+        view_payload,
+        report,
+        fundamentals=f,
+        intent=intent,
+        disabled_raw=disabled,
+        flags_raw=flags,
+        checklist=checklist,
+    )

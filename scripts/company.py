@@ -22,7 +22,7 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 if __package__:
-    from finance_skills import analyze, metrics, redflags
+    from finance_skills import analyze, metrics, redflags, report_schema
     from finance_skills.cli import run_single_ticker
     from finance_skills.data import Fundamentals
     from finance_skills.format import fmt_money, footer, leverage_cell, pct, source_line
@@ -30,6 +30,7 @@ else:
     import analyze
     import metrics
     import redflags
+    import report_schema
     from cli import run_single_ticker
     from data import Fundamentals
     from format import fmt_money, footer, leverage_cell, pct, source_line
@@ -167,10 +168,13 @@ def _verdict(r: dict, regime: str | None) -> list[str]:
 def build_company(f: Fundamentals, as_json: bool = False):
     report = analyze.build_report(f)
     if not report.get("available", True):
-        return report if as_json else analyze.format_report(report)
+        if as_json:
+            return report_schema.enrich_report_for_agent(f, report, dict(report), intent="company")
+        return analyze.format_report(report)
     if as_json:
-        return {"ticker": report["ticker"], "sections": [
+        payload = {"ticker": report["ticker"], "sections": [
             {"heading": h, "lines": ls} for h, ls in _story(report)]}
+        return report_schema.enrich_report_for_agent(f, report, payload, intent="company")
     return _render(report, _story(report))
 
 

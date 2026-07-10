@@ -21,13 +21,14 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 if __package__:
-    from finance_skills import metrics
+    from finance_skills import metrics, report_schema
     from finance_skills.cli import run_single_ticker
     from finance_skills.data import Fundamentals
     from finance_skills.format import DISCLAIMER as DISCLAIMER
     from finance_skills.format import fmt_money, footer, pct, source_line
 else:
     import metrics
+    import report_schema
     from cli import run_single_ticker
     from data import Fundamentals
     from format import DISCLAIMER as DISCLAIMER
@@ -267,7 +268,9 @@ def format_report(r: dict) -> str:
 def build_report_view(f: Fundamentals, as_json: bool = False):
     """View adapter for the shared CLI / export registry."""
     r = build_report(f)
-    return r if as_json else format_report(r)
+    if not as_json:
+        return format_report(r)
+    return report_schema.enrich_report_for_agent(f, r, dict(r), intent="analyze")
 
 
 def main(argv: list[str]) -> int:

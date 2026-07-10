@@ -19,12 +19,13 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 if __package__:
-    from finance_skills import analyze
+    from finance_skills import analyze, report_schema
     from finance_skills.cli import run_single_ticker
     from finance_skills.data import Fundamentals
     from finance_skills.format import footer, pct, source_line
 else:
     import analyze
+    import report_schema
     from cli import run_single_ticker
     from data import Fundamentals
     from format import footer, pct, source_line
@@ -89,10 +90,13 @@ def flags_for(report: dict, *, limit: int | None = None) -> list[dict]:
 def build_redflags(f: Fundamentals, as_json: bool = False):
     report = analyze.build_report(f)
     if not report.get("available", True):
-        return report if as_json else analyze.format_report(report)
+        if as_json:
+            return report_schema.enrich_report_for_agent(f, report, dict(report), intent="redflags")
+        return analyze.format_report(report)
     flags = flags_for(report)
     if as_json:
-        return {"ticker": report["ticker"], "flag_count": len(flags), "flags": flags}
+        payload = {"ticker": report["ticker"], "flag_count": len(flags), "flags": flags}
+        return report_schema.enrich_report_for_agent(f, report, payload, intent="redflags")
     return _render(report, flags)
 
 

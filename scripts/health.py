@@ -18,7 +18,7 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 if __package__:
-    from finance_skills import analyze
+    from finance_skills import analyze, report_schema
     from finance_skills.cli import run_single_ticker
     from finance_skills.data import Fundamentals
     from finance_skills.format import (
@@ -30,6 +30,7 @@ if __package__:
     )
 else:
     import analyze
+    import report_schema
     from cli import run_single_ticker
     from data import Fundamentals
     from format import fmt_money, leverage_cell, pct, render_metric_table, source_line
@@ -100,11 +101,14 @@ def _verdict(f: Fundamentals, r: dict) -> str:
 def build_health(f: Fundamentals, as_json: bool = False):
     report = analyze.build_report(f)
     if not report.get("available", True):
-        return report if as_json else analyze.format_report(report)
+        if as_json:
+            return report_schema.enrich_report_for_agent(f, report, dict(report), intent="health")
+        return analyze.format_report(report)
     rows = _rows(f, report)
     if as_json:
-        return {"ticker": report["ticker"], "verdict": _verdict(f, report),
+        payload = {"ticker": report["ticker"], "verdict": _verdict(f, report),
                 "rows": [{"metric": m, "value": v, "read": rd} for m, v, rd in rows]}
+        return report_schema.enrich_report_for_agent(f, report, payload, intent="health")
     title = [
         f"═══ {report['name'] or report['ticker']} ({report['ticker']}) — financial health ═══",
         source_line(report),

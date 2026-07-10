@@ -6,6 +6,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-11
+
+### Added
+- **Hard agent gate** in SKILL: no numbers without `route --json` + engine `--json` this turn.
+- **`engine_report` on all core JSON verbs** (brief, valuation, redflags, health, company, analyze).
+- **Public eval** `docs/eval.md` (20 prompts) + **transcript hard-fail** tests (`agent_eval`, `test_agent_transcripts`).
+- **Demo GIF** `docs/demo.gif` (route → fixture → no-buy answer).
+- **`docs/SOCIAL.md`** — post to agent/Claude communities, not investing subs.
+
+### Changed
+- README sells the **agent contract** first; data-quality (yfinance / 10-K) before demos.
+- MCP described as **not shipped** (no vibe claims).
+
 ## [0.5.3] - 2026-07-11
 
 ### Added (agent middleware P0–P2)

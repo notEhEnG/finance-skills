@@ -17,13 +17,14 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 if __package__:
-    from finance_skills import analyze, explain
+    from finance_skills import analyze, explain, report_schema
     from finance_skills.cli import has_flag, run_single_ticker
     from finance_skills.data import Fundamentals
     from finance_skills.format import fmt_money, leverage_cell, mult, pct, render_metric_table, source_line
 else:
     import analyze
     import explain
+    import report_schema
     from cli import has_flag, run_single_ticker
     from data import Fundamentals
     from format import fmt_money, leverage_cell, mult, pct, render_metric_table, source_line
@@ -177,11 +178,13 @@ def build_valuation(f: Fundamentals, as_json: bool = False, flags: set[str] | No
     flags = flags or set()
     report = analyze.build_report(f)
     if not report.get("available", True):
-        return report if as_json else analyze.format_report(report)
+        if as_json:
+            return report_schema.enrich_report_for_agent(f, report, dict(report), intent="valuation")
+        return analyze.format_report(report)
     rows = _rows(report)
     why = explain.why_lines_for_report(report) if has_flag(flags, "explain") else []
     if as_json:
-        return {
+        payload = {
             "ticker": report["ticker"],
             "verdict": _verdict(report),
             "rows": [{"metric": m, "value": v, "read": rd} for m, v, rd in rows],
@@ -189,6 +192,7 @@ def build_valuation(f: Fundamentals, as_json: bool = False, flags: set[str] | No
             "dcf_note": report.get("dcf_note"),
             "why": why,
         }
+        return report_schema.enrich_report_for_agent(f, report, payload, intent="valuation")
     title = [
         f"═══ {report['name'] or report['ticker']} ({report['ticker']}) — valuation ═══",
         source_line(report),

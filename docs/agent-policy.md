@@ -3,6 +3,11 @@
 Executable companion to [`SKILL.md`](../SKILL.md). Agents must follow this when
 composing user-visible answers after routing / engine runs.
 
+## Hard gate
+
+**No `route --json` + engine `--json` this turn ⇒ no financial numbers in the answer.**  
+Repeat: skip-tools / quick-take / from-knowledge still require both steps for in-scope company questions.
+
 ## Claim vocabulary
 
 | Kind | May include | Must not |
