@@ -69,14 +69,15 @@ def rank_reports(reports: list[dict]) -> dict[str, Any]:
 
 
 def render_ranking(ranking: dict[str, Any]) -> list[str]:
+    """Emoji + bold leaders for scannable compare/screen summaries."""
     labels = [
-        ("best_growth", "Best growth (YoY revenue)"),
-        ("worst_dilution", "Worst dilution (share count YoY)"),
-        ("highest_burn", "Highest cash burn (lowest FCF margin)"),
-        ("cheapest_ev_sales", "Cheapest EV/Sales"),
-        ("strongest_rule40", "Strongest Rule of 40 (preferred)"),
+        ("best_growth", "📈 Best growth (YoY revenue)"),
+        ("worst_dilution", "⚠️ Worst dilution (share count YoY)"),
+        ("highest_burn", "🔥 Highest cash burn (lowest FCF margin)"),
+        ("cheapest_ev_sales", "💰 Cheapest EV/Sales"),
+        ("strongest_rule40", "📏 Strongest Rule of 40 (preferred)"),
     ]
-    lines = [f"Ranking summary ({ranking.get('n', 0)} tickers with data)"]
+    lines = [f"**Ranking summary** ({ranking.get('n', 0)} tickers with data)"]
     for key, label in labels:
         hit = ranking.get(key)
         if not hit:
@@ -87,5 +88,5 @@ def render_ranking(ranking: dict[str, Any]) -> list[str]:
             shown = f"{val:g}"
         else:
             shown = str(val)
-        lines.append(f"  · {label}: {hit['ticker']} ({shown})")
+        lines.append(f"  {label}: **{hit['ticker']}** ({shown})")
     return lines

@@ -103,11 +103,49 @@ def _limit_lead(report: dict[str, Any] | None, intent: str | None) -> list[str]:
     return leads[:4]
 
 
+def _compare_table_block(report: dict[str, Any]) -> list[str]:
+    """Prefer engine markdown_table; rebuild if missing."""
+    lines: list[str] = []
+    legend = report.get("legend") or {}
+    if legend.get("leader") or legend.get("warn"):
+        lines.append(
+            f"_Legend: {legend.get('leader', '🏆 = leader')} · "
+            f"{legend.get('warn', '⚠️ = worst on burn/leverage')}_"
+        )
+    md = report.get("markdown_table")
+    if not md and report.get("rows") and report.get("tickers"):
+        # Rebuild a simple highlighted table from row payloads
+        tickers = list(report["tickers"])
+        header = "| **Metric** | " + " | ".join(f"**{t}**" for t in tickers) + " |"
+        sep = "| :--- | " + " | ".join([":---:"] * len(tickers)) + " |"
+        body = [header, sep]
+        for row in report["rows"]:
+            if not isinstance(row, dict):
+                continue
+            hi = row.get("highlighted") or row.get("values") or {}
+            cells = [str(hi.get(t, "n/a")) for t in tickers]
+            body.append(f"| **{row.get('metric', '?')}** | " + " | ".join(cells) + " |")
+        md = "\n".join(body)
+    if md:
+        lines.append(md)
+    for rl in report.get("ranking_lines") or []:
+        lines.append(rl)
+    return lines
+
+
 def _evidence_lines(report: dict[str, Any], intent: str) -> list[str]:
     lines: list[str] = []
+
+    # Compare: full markdown table (not dict dumps)
+    if intent == "compare" and (report.get("markdown_table") or report.get("tickers")):
+        return _compare_table_block(report)
+
     # Valuation / health style rows
     for row in report.get("rows") or []:
         if not isinstance(row, dict):
+            continue
+        # Skip compare-shaped rows ({metric, values})
+        if "values" in row and "value" not in row:
             continue
         m, v, rd = row.get("metric"), row.get("value"), row.get("read")
         if m and v is not None:
@@ -144,21 +182,12 @@ def _evidence_lines(report: dict[str, Any], intent: str) -> list[str]:
         if sol.get("fcf_margin_pct") is not None:
             lines.append(f"- **FCF margin:** {_fmt_pct(sol['fcf_margin_pct'])}")
 
-    # Compare matrix (tickers as keys)
-    if intent == "compare" and report.get("tickers"):
-        lines.append(f"- **Tickers:** {', '.join(report['tickers'])}")
-        for row in (report.get("rows") or report.get("metrics") or [])[:5]:
-            if isinstance(row, dict):
-                lines.append(f"- {row}")
-            elif isinstance(row, (list, tuple)) and row:
-                lines.append(f"- {row}")
-
     for fl in _flags(report):
         name = fl.get("flag") or fl.get("name") or "flag"
         detail = fl.get("detail") or ""
         lines.append(f"- **Flag — {name}:** {detail}")
 
-    return lines[:8]
+    return lines[:12]
 
 
 def _headline(report: dict[str, Any] | None, intent: str, tickers: list[str]) -> str:
@@ -272,7 +301,10 @@ def draft_from_report(
 
     evidence = _evidence_lines(report, intent)
     if evidence:
-        parts.append("**Evidence (engine only)**")
+        if intent == "compare":
+            parts.append("**Comparison table** (🏆 leader · ⚠️ worst on burn/leverage)")
+        else:
+            parts.append("**Evidence (engine only)**")
         parts.extend(evidence)
 
     # Secondary risk note for compare+safer style

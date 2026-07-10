@@ -26,6 +26,7 @@ class TestCompare(unittest.TestCase):
         self.assertEqual(r["tickers"], ["CRWV", "NBIS"])
         for row in r["rows"]:
             self.assertEqual(set(row["values"]), {"CRWV", "NBIS"})
+            self.assertIn("highlighted", row)
 
     def test_numbers_match_the_engine(self):
         # A compare cell must equal the ticker's own engine number (no divergence).
@@ -35,11 +36,27 @@ class TestCompare(unittest.TestCase):
         growth_row = next(row for row in r["rows"] if row["metric"] == "Revenue growth")
         self.assertIn(f"{rep['derived']['revenue_growth_pct']:.1f}", growth_row["values"]["CRWV"])
 
+    def test_markdown_table_and_leaders(self):
+        r = compare.build_compare(_reports("CRWV", "NBIS"), as_json=True)
+        self.assertIn("markdown_table", r)
+        md = r["markdown_table"]
+        self.assertIn("| **Metric** |", md)
+        self.assertIn("**CRWV**", md)
+        self.assertIn("**NBIS**", md)
+        self.assertIn("🏆", md)  # at least one leader
+        growth = next(row for row in r["rows"] if row["metric"] == "Revenue growth")
+        self.assertEqual(growth["leader"], "NBIS")
+        self.assertIn("**", growth["highlighted"]["NBIS"])
+        self.assertIn("verdict", r)
+        self.assertIn("NBIS", r["verdict"])
+
     def test_text_render_aligns_and_has_footer(self):
         text = compare.build_compare(_reports("CRWV", "NBIS"), as_json=False)
         self.assertIn("CRWV", text)
         self.assertIn("NBIS", text)
         self.assertIn("Not investment advice", text)
+        self.assertIn("| **Metric** |", text)
+        self.assertIn("🏆", text)
 
     def test_needs_two_tickers(self):
         self.assertEqual(_exit_code(["CRWV", "--fixture"]), 2)
