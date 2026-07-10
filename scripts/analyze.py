@@ -20,8 +20,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import metrics
-from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
+try:  # installed as the `finance_skills` package…
+    from finance_skills import metrics
+    from finance_skills.data import Fundamentals, get_fundamentals_or_fixture, load_fixture
+except ImportError:  # …or run directly via `python3 scripts/analyze.py` (skill path)
+    import metrics
+    from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
 
 # Map yfinance sector/industry text to a benchmark key in metrics.SECTOR_BENCHMARKS.
 _SECTOR_HINTS = [
@@ -167,12 +171,30 @@ def _pct(v) -> str:
     return "n/a" if v is None else f"{v:.1f}%"
 
 
+DISCLAIMER = (
+    "Read-only market analysis for research/education. Not investment advice; "
+    "no trades are placed. Verify figures against primary filings before acting."
+)
+
+
+def _source_line(r: dict) -> str:
+    """The 'Source: <src> · as of <date> [SAMPLE DATA]' subheader shared by every
+    report view, so the fixture-warning wording can't drift between verbs."""
+    return (f"Source: {r['source']} · as of {r['as_of']}"
+            + ("  [SAMPLE DATA — not live]" if r["source"] == "fixture" else ""))
+
+
+def _footer() -> list[str]:
+    """The rule + not-advice disclaimer that closes every report view. One copy so
+    a compliance edit lands everywhere at once."""
+    return ["─" * 60, DISCLAIMER]
+
+
 def _format(r: dict) -> str:
     d = r["derived"]
     lines = [
         f"═══ {r['name'] or r['ticker']} ({r['ticker']}) ═══",
-        f"Source: {r['source']} · as of {r['as_of']}"
-        + ("  [SAMPLE DATA — not live]" if r["source"] == "fixture" else ""),
+        _source_line(r),
         f"Sector: {r.get('sector') or 'n/a'} / {r.get('industry') or 'n/a'}",
         f"Price: {_fmt_money(r.get('price'))}   Market cap: {_fmt_money(r.get('market_cap'))}",
         "",
@@ -216,12 +238,7 @@ def _format(r: dict) -> str:
     if "leverage" in r:
         lines += [f"Leverage: net debt / EBITDA = {r['leverage']['net_debt_to_ebitda']}x"]
 
-    lines += [
-        "",
-        "─" * 60,
-        "Read-only market analysis for research/education. Not investment advice; "
-        "no trades are placed. Verify figures against primary filings before acting.",
-    ]
+    lines += ["", *_footer()]
     return "\n".join(lines)
 
 

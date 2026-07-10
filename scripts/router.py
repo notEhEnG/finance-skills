@@ -43,6 +43,42 @@ CANONICAL: set[str] = set(TOP_VERBS) | {
     "learn", "screen", "rank", "portfolio", "watchlist", "export", "help",
 }
 
+# Plain-English trigger phrases -> verb, for the TOP verbs only (the rest still
+# resolve via an explicit token through `resolve`). Checked as substrings against
+# the lowered question, LONGEST phrase first, so "is it a buy" beats "buy" and
+# routing is deterministic. This is the "keywords section": it turns a natural
+# question into a verb without the agent having to guess. Keep phrases specific —
+# a phrase this loose would misfire (that's why "growth" here needs "growth rate"
+# / "top line", not the bare word, which also appears inside "growth stock").
+KEYWORDS: dict[str, list[str]] = {
+    "valuation": ["is it a buy", "is it cheap", "is it expensive", "over valued",
+                  "overvalued", "under valued", "undervalued", "fairly valued",
+                  "fair value", "worth buying", "priced right", "too expensive",
+                  "how cheap", "cheap or", "should i buy", "a buy", "a sell",
+                  "buy or sell", "cheap"],
+    "risk":      ["is it safe", "how risky", "how safe", "blow up", "go bankrupt",
+                  "going bankrupt", "could it collapse", "is it a trap", "a value trap",
+                  "downside risk", "too much debt", "risky"],
+    "redflags":  ["red flag", "red flags", "warning sign", "anything wrong",
+                  "accounting concern", "going concern", "shady", "smell right",
+                  "anything to worry"],
+    "health":    ["financial health", "balance sheet", "how healthy", "altman",
+                  "piotroski", "bankruptcy risk", "cash runway", "solvency",
+                  "self funding", "self-funding"],
+    "growth":    ["growth rate", "top line", "how fast is it growing", "revenue trend",
+                  "decelerating", "accelerating", "growing fast", "is it growing",
+                  "still growing"],
+    "moat":      ["a moat", "the moat", "competitive advantage", "pricing power",
+                  "durable edge", "an edge", "defensible", "wide moat"],
+    "dcf":       ["intrinsic value", "discounted cash flow", "fair price", "what is it worth",
+                  "what's it worth", "dcf", "worth"],
+    "rule40":    ["rule of 40", "rule of forty", "rule40", "r40", "40 rule"],
+    "compare":   ["compare", " versus ", " vs ", "head to head", "head-to-head",
+                  "better than", "which is better", "stack up against"],
+    "company":   ["tell me about", "walk me through", "give me the full picture",
+                  "overview of", "break it down", "deep dive"],
+}
+
 # Shorthand and common typos/spellings -> canonical (overview-2 "Alias Forgiveness").
 ALIASES: dict[str, str] = {
     "val": "valuation", "valn": "valuation", "value": "valuation",
@@ -109,6 +145,56 @@ def resolve(raw: str, fuzzy_cutoff: float = 0.72) -> Resolution:
     # Nothing close enough — offer best-effort hints, don't error out.
     hints = get_close_matches(token, sorted(CANONICAL), n=3, cutoff=0.4)
     return Resolution(raw, None, "unknown", hints or TOP_VERBS.copy())
+
+
+# Flat (phrase, verb) index, ordered longest-phrase-first then alphabetically, so
+# a substring scan is deterministic regardless of dict iteration order. Ties on
+# length break by phrase text, then verb — never by hash order.
+_PHRASE_INDEX: list[tuple[str, str]] = sorted(
+    ((phrase, verb) for verb, phrases in KEYWORDS.items() for phrase in phrases),
+    key=lambda pv: (-len(pv[0]), pv[0], pv[1]),
+)
+
+
+@dataclass
+class Route:
+    text: str
+    verb: str | None             # best-matching verb, or None if nothing triggered
+    matched: list[tuple[str, str]]  # every (verb, phrase) hit, best first
+    method: str                  # "keyword" | "verb" | "none"
+
+    @property
+    def resolved(self) -> bool:
+        return self.verb is not None
+
+
+def route(text: str) -> Route:
+    """Map a natural-English question to a verb via the KEYWORDS index.
+
+    Longest phrase wins (see `_PHRASE_INDEX`), so specific intents beat generic
+    ones. Falls back to treating the first word as an explicit verb token (via
+    `resolve`), so `route("valuation NBIS")` still lands on `valuation`. Returns
+    verb=None when nothing triggers — the caller (agent) then uses judgment.
+    """
+    lowered = f" {text.strip().lower()} "
+    matched: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for phrase, verb in _PHRASE_INDEX:
+        if phrase in lowered and verb not in seen:
+            matched.append((verb, phrase))
+            seen.add(verb)
+    if matched:
+        return Route(text, matched[0][0], matched, "keyword")
+
+    # No phrase hit — maybe the user led with an explicit verb token. Only trust
+    # an *exact* or *alias* match here: a fuzzy hit on a leading English word
+    # ("what", "how", "should") would hijack a plain question that has no verb.
+    first = text.strip().split()
+    if first:
+        res = resolve(first[0])
+        if res.method in ("exact", "alias"):
+            return Route(text, res.command, [(res.command, first[0])], "verb")
+    return Route(text, None, [], "none")
 
 
 # --- Ticker extraction (front-door helper) --------------------------------
@@ -186,6 +272,7 @@ def format_help() -> str:
         "",
         "Shorthand works too: val→valuation, r40→rule40, comp→compare, semis→semiconductor.",
         "Typos are tolerated (e.g. 'vluation' → valuation).",
+        "Plain-English triggers a verb: `router.py route \"is NBIS a value trap?\"` → risk.",
     ]
     return "\n".join(lines)
 
@@ -198,6 +285,15 @@ def main(argv: list[str]) -> int:
         tickers = extract_tickers(" ".join(argv[1:]))
         print(" ".join(tickers) if tickers else "(no ticker found)")
         return 0 if tickers else 1
+    if argv[0].lower() == "route":
+        r = route(" ".join(argv[1:]))
+        if r.verb is None:
+            print("(no verb triggered — infer intent from the routing table)")
+            return 1
+        others = ", ".join(v for v, _ in r.matched[1:])
+        extra = f"  (also matched: {others})" if others else ""
+        print(f"{r.verb}  [{r.method}]{extra}")
+        return 0
     res = resolve(argv[0])
     if res.method == "exact":
         print(f"{res.input} → {res.command}")

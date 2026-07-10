@@ -16,9 +16,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import analyze
-from analyze import _fmt_money, _pct
-from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
+try:  # installed as the `finance_skills` package…
+    from finance_skills import analyze
+    from finance_skills.analyze import _fmt_money, _pct
+    from finance_skills.data import Fundamentals, get_fundamentals_or_fixture, load_fixture
+except ImportError:  # …or run directly via `python3 scripts/valuation.py` (skill path)
+    import analyze
+    from analyze import _fmt_money, _pct
+    from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
 
 
 def _mult(v) -> str:
@@ -43,9 +48,13 @@ def _rows(r: dict) -> list[tuple[str, str, str]]:
 
     # EV / EBITDA — flag when EBITDA margin > 100% (non-operating items inflate it).
     eve, em = d.get("ev_ebitda"), d.get("ebitda_margin_pct")
-    distorted = em is not None and em > 100
-    eve_read = ("⚠ distorted — EBITDA margin >100% (non-operating items); trust EV/Sales more"
-                if distorted and eve is not None else _ev_ebitda_read(eve))
+    if em is not None and em > 100 and eve is not None:
+        eve_read = "⚠ distorted — EBITDA margin >100% (non-operating items); trust EV/Sales more"
+    elif eve is None:
+        # Name the actual missing input rather than blaming EBITDA generically.
+        eve_read = "net debt unknown" if ev is None else "needs positive EBITDA"
+    else:
+        eve_read = _ev_ebitda_read(eve)
     rows.append(("EV / EBITDA", _mult(eve), eve_read))
 
     # DCF — intrinsic value per share, or why it's skipped.
@@ -70,14 +79,20 @@ def _rows(r: dict) -> list[tuple[str, str, str]]:
     rows.append(("FCF margin", _pct(d.get("fcf_margin_pct")), _fcf_read(d.get("fcf_margin_pct"))))
     if "leverage" in r:
         x = r["leverage"]["net_debt_to_ebitda"]
-        rows.append(("Net debt / EBITDA", f"{x}x",
-                     "low leverage" if x < 3 else "elevated — watch refinancing"))
+        # Negative net debt is net cash, not "low leverage" — say so and drop the sign.
+        if x < 0:
+            value, read = f"net cash ({abs(x)}x)", "net cash — no leverage risk"
+        else:
+            value, read = f"{x}x", "low leverage" if x < 3 else "elevated — watch refinancing"
+        rows.append(("Net debt / EBITDA", value, read))
     return rows
 
 
 def _ev_sales_read(v) -> str:
     if v is None:
         return "not computable"
+    if v < 0:
+        return "negative EV — net cash exceeds market cap"
     if v >= 20:
         return "extreme — priced on growth, not sales"
     if v >= 10:
@@ -88,6 +103,8 @@ def _ev_sales_read(v) -> str:
 def _ev_ebitda_read(v) -> str:
     if v is None:
         return "needs positive EBITDA and known net debt"
+    if v < 0:
+        return "negative EV — net cash exceeds market cap"
     if v >= 30:
         return "expensive"
     if v >= 15:
@@ -128,9 +145,13 @@ def _verdict(r: dict) -> str:
         stance = "screens cheap" if ps >= price else "screens rich"
         return f"{stance} vs a heuristic DCF near {_fmt_money(ps)}/share; corroborate with the multiples above."
     evs = d.get("ev_sales")
-    tail = f"EV/Sales {evs}x" if evs is not None else "rich multiples"
+    if evs is None:
+        # Neither an intrinsic anchor (no positive-FCF DCF) nor an EV multiple is
+        # available — don't assert a valuation on no data.
+        return ("No positive-FCF DCF and EV/Sales isn't computable (net debt or revenue "
+                "unknown), so there isn't enough data to call it cheap or expensive.")
     return (f"No DCF (FCF not positive), so it can't be anchored to intrinsic value — "
-            f"expensive on {tail}; a growth/backlog bet, not supported by current cash flows.")
+            f"expensive on EV/Sales {evs}x; a growth/backlog bet, not supported by current cash flows.")
 
 
 def build_valuation(f: Fundamentals, as_json: bool = False):
@@ -149,21 +170,14 @@ def _render(r: dict, rows: list[tuple[str, str, str]]) -> str:
     vw = max(len(v) for _, v, _ in rows)
     out = [
         f"═══ {r['name'] or r['ticker']} ({r['ticker']}) — valuation ═══",
-        f"Source: {r['source']} · as of {r['as_of']}"
-        + ("  [SAMPLE DATA — not live]" if r["source"] == "fixture" else ""),
+        analyze._source_line(r),
         "",
         f"  {'Metric'.ljust(mw)}   {'Value'.ljust(vw)}   Read",
         f"  {'─' * (mw + vw + 40)}",
     ]
     for m, v, rd in rows:
         out.append(f"  {m.ljust(mw)}   {v.ljust(vw)}   {rd}")
-    out += [
-        "",
-        f"Verdict: {_verdict(r)}",
-        "─" * 60,
-        "Read-only market analysis for research/education. Not investment advice; "
-        "no trades are placed. Verify figures against primary filings before acting.",
-    ]
+    out += ["", f"Verdict: {_verdict(r)}", *analyze._footer()]
     return "\n".join(out)
 
 

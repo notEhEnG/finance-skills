@@ -292,25 +292,29 @@ def enterprise_value(market_cap: float | None, net_debt: float | None) -> float 
     return market_cap + net_debt
 
 
-def ev_ebitda(market_cap: float | None, net_debt: float | None, ebitda: float | None) -> float | None:
-    """Enterprise-value / EBITDA multiple, or None if not meaningfully computable.
+def _ev_multiple(market_cap: float | None, net_debt: float | None,
+                 denominator: float | None) -> float | None:
+    """EV / <denominator> multiple, or None if not meaningfully computable.
 
-    None when EV can't be formed (see enterprise_value). Negative or zero EBITDA
-    also yields None — the multiple is meaningless there, so say n/a rather than
-    print a nonsense number."""
+    None when EV can't be formed (see enterprise_value). A None, zero, or negative
+    denominator also yields None — the multiple is meaningless there, so say n/a
+    rather than print a nonsense number. Shared by ev_ebitda and ev_sales so the
+    guard can't drift between the two."""
     ev = enterprise_value(market_cap, net_debt)
-    if ev is None or ebitda in (None, 0) or ebitda < 0:
+    if ev is None or denominator in (None, 0) or denominator < 0:
         return None
-    return round(ev / ebitda, 1)
+    return round(ev / denominator, 1)
+
+
+def ev_ebitda(market_cap: float | None, net_debt: float | None, ebitda: float | None) -> float | None:
+    """Enterprise-value / EBITDA multiple, or None if not meaningfully computable."""
+    return _ev_multiple(market_cap, net_debt, ebitda)
 
 
 def ev_sales(market_cap: float | None, net_debt: float | None, revenue: float | None) -> float | None:
     """Enterprise-value / sales multiple, or None if not computable. Useful when a
     DCF is unavailable (negative FCF) and EV/EBITDA is distorted."""
-    ev = enterprise_value(market_cap, net_debt)
-    if ev is None or revenue in (None, 0) or revenue < 0:
-        return None
-    return round(ev / revenue, 1)
+    return _ev_multiple(market_cap, net_debt, revenue)
 
 
 def yoy_growth(current: float | None, prior: float | None) -> float | None:

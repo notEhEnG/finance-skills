@@ -42,10 +42,18 @@ Handle any of them in three steps:
 
 2. **Determine intent.** If the first token is a verb (`company`, `analyze`,
    `valuation`, `framework`, `compare`, `learn`, `growth`, `risk`, `moat`,
-   `dcf`, `rule40`, `fiveforces`, `industry`, …) or a known alias (`co`, `fw`,
-   `val`, `r40`, `comp`, …), use it. Otherwise infer intent from the question via
-   the routing table below. Resolve shorthand/typos with
-   `python3 scripts/router.py <token>`.
+   `dcf`, `rule40`, `redflags`, `health`, `screen`, `fiveforces`, `industry`, …)
+   or a known alias (`co`, `fw`, `val`, `r40`, `comp`, …), use it. Otherwise infer
+   intent. For plain-English questions, the router has an explicit **keyword map**
+   (`KEYWORDS`) that resolves the phrase to a verb deterministically — prefer it
+   over guessing:
+   ```bash
+   python3 scripts/router.py route "is NBIS a value trap?"   # -> risk
+   python3 scripts/router.py route "any red flags in PLTR?"  # -> redflags
+   ```
+   `route` returns a verb only when a trigger phrase matches (longest phrase
+   wins); when it returns none, fall back to the semantic routing table below.
+   Resolve shorthand/typos on a single token with `python3 scripts/router.py <token>`.
 
 3. **Run the matching command, then answer the actual question.** Every command
    is a view over the one engine (`scripts/analyze.py`), so numbers never diverge:
@@ -53,7 +61,13 @@ Handle any of them in three steps:
    python3 scripts/company.py    <TICKER> [--fixture|--json]   # sequential walkthrough
    python3 scripts/valuation.py  <TICKER> [--fixture|--json]   # "is it cheap?" as a table
    python3 scripts/framework.py  <name> <TICKER> [--fixture]   # a framework as a checklist
+   python3 scripts/redflags.py   <TICKER> [--fixture|--json]   # "what could go wrong?" flags
+   python3 scripts/health.py     <TICKER> [--fixture|--json]   # solvency / leverage / runway
+   python3 scripts/compare.py    <A> <B> [...] [--fixture]     # side-by-side table
    python3 scripts/analyze.py    <TICKER> [--fixture|--json]   # flagship report
+   python3 scripts/screen.py     "<rule>" [TICKER ...]         # filter a set by a rule
+   python3 scripts/watchlist.py  <add|list|run ...>            # saved lists, any verb across them
+   python3 scripts/export.py     <TICKER> [--verb= --format=]  # md/json/csv report file
    python3 scripts/learn.py      <concept>                     # explain a concept (offline)
    ```
    Read the output and answer in plain English — lead with the part that answers
@@ -97,8 +111,14 @@ One shared engine backs everything (`scripts/`), so numbers never diverge:
 - `analyze.py` — orchestrates fetch → compute → report (`--json` for composing).
 - `company.py` — sequences the engine into a 9-stage narrative walkthrough.
 - `framework.py` — runs a named framework (saas, neocloud, semiconductor) as a checklist.
+- `redflags.py` — scans the engine report for warning signs, with severity.
+- `health.py` — solvency view: leverage, self-funding, cash runway, dilution.
+- `compare.py` — side-by-side table for two+ tickers, one column each.
+- `screen.py` — filters a set of tickers by a tiny, safe `field op value` rule language.
+- `watchlist.py` — persists named ticker lists (`.cache/`) and runs any verb across them.
+- `export.py` — renders a verb's output to a Markdown/JSON/CSV file.
 - `learn.py` — offline concept explainers (no ticker, no network).
-- `router.py` — ticker extraction, alias/fuzzy command resolution, grouped help.
+- `router.py` — ticker extraction, alias/fuzzy resolution, **keyword→verb routing**, grouped help.
 
 Honesty rule: `framework.py` computes only what the filings support. Metrics that
 need a **disclosed KPI not in the financial statements** (Magic Number, CAC
@@ -121,8 +141,13 @@ view over the same engine, so numbers never diverge:
 - `rule40 <ticker>` — the segment-aware Rule of 40 slice
 - `growth <ticker>` — revenue/margin trend + regime
 - `risk <ticker>` — leverage, FCF, dilution, concentration
+- `redflags <ticker>` — warning-sign scan with severity → `scripts/redflags.py`
+- `health <ticker>` — solvency, leverage, cash runway → `scripts/health.py`
 - `moat <ticker>` / `fiveforces <ticker>` — durable-edge / Porter assessment
-- `compare <a> <b>` — run both, contrast
+- `compare <a> <b> [...]` — real side-by-side table → `scripts/compare.py`
+- `screen "<rule>" [tickers]` — filter by `field op value` (rule40, growth, fcf_margin, …) → `scripts/screen.py`
+- `watchlist add|list|run <verb>` — saved lists, any verb across them → `scripts/watchlist.py`
+- `export <ticker> --format md|json|csv` — shareable report file → `scripts/export.py`
 - `learn <concept>` — teach a concept (dcf, rule40, magic-number, nrr, …)
 
 `fiveforces` and `industry` are qualitative: apply the framework using the

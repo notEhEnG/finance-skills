@@ -76,6 +76,50 @@ class TestTickerExtraction(unittest.TestCase):
         self.assertEqual(router.extract_tickers("is the U.S. market a buy"), [])
 
 
+class TestKeywordRouting(unittest.TestCase):
+    def test_plain_questions_map_to_expected_verb(self):
+        cases = {
+            "is NBIS a value trap?": "risk",
+            "is NVDA a buy?": "valuation",
+            "any red flags in PLTR?": "redflags",
+            "how does AMD compare to NVDA": "compare",
+            "rule of 40 for CRM": "rule40",
+            "tell me about SNOW": "company",
+            "what's the financial health of CRWV": "health",
+            "does AMD have a moat": "moat",
+            "growth rate of SNOW": "growth",
+        }
+        for question, verb in cases.items():
+            self.assertEqual(router.route(question).verb, verb,
+                             f"{question!r} should route to {verb}")
+
+    def test_longest_phrase_wins(self):
+        # "is it a buy" (valuation) must beat the bare "buy"/generic signals.
+        self.assertEqual(router.route("do you think it is a buy here").verb, "valuation")
+
+    def test_explicit_verb_token_still_routes(self):
+        r = router.route("valuation NBIS")
+        self.assertEqual(r.verb, "valuation")
+        self.assertEqual(r.method, "verb")
+
+    def test_leading_question_word_does_not_hijack(self):
+        # A fuzzy match on "what"/"how" must NOT be treated as a verb token.
+        self.assertIsNone(router.route("what color is the sky").verb)
+
+    def test_no_trigger_returns_none(self):
+        r = router.route("please water the plants")
+        self.assertIsNone(r.verb)
+        self.assertEqual(r.method, "none")
+
+    def test_every_keyword_verb_is_canonical(self):
+        for verb in router.KEYWORDS:
+            self.assertIn(verb, router.CANONICAL, f"KEYWORDS references unknown verb: {verb}")
+
+    def test_route_is_deterministic(self):
+        verbs = {router.route("is it cheap or a value trap").verb for _ in range(20)}
+        self.assertEqual(len(verbs), 1)
+
+
 class TestDeterminism(unittest.TestCase):
     def test_fuzzy_is_stable_across_calls(self):
         # Sorted pools mean a tie-prone typo resolves identically every time.

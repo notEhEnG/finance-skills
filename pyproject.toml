@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finance-skills"
+version = "0.3.0"
+description = "Analyst-style equity research over one shared engine: segment-aware Rule of 40, DCF, red flags, screening — read-only, not investment advice."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Bryan" }]
+keywords = ["finance", "stocks", "equity-research", "valuation", "dcf", "rule-of-40", "fundamentals", "yfinance"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Operating System :: OS Independent",
+]
+dependencies = ["yfinance>=0.2"]
+
+[project.urls]
+Homepage = "https://github.com/notEhEnG/finance-skills"
+Repository = "https://github.com/notEhEnG/finance-skills"
+
+[project.scripts]
+finance-skills = "finance_skills._entry:run"
+
+[tool.setuptools]
+# The sources live in scripts/ (so the agent-skill path `python3 scripts/router.py`
+# keeps working), but they install as the importable `finance_skills` package.
+packages = ["finance_skills"]
+package-dir = { "finance_skills" = "scripts" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

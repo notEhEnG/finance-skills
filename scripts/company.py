@@ -22,10 +22,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import analyze
-import metrics
-from analyze import _fmt_money, _pct
-from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
+try:  # installed as the `finance_skills` package…
+    from finance_skills import analyze, metrics
+    from finance_skills.analyze import _fmt_money, _pct
+    from finance_skills.data import Fundamentals, get_fundamentals_or_fixture, load_fixture
+except ImportError:  # …or run directly via `python3 scripts/company.py` (skill path)
+    import analyze
+    import metrics
+    from analyze import _fmt_money, _pct
+    from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
 
 ARROW = "        ▼"
 
@@ -172,8 +177,7 @@ def build_company(f: Fundamentals, as_json: bool = False):
 def _render(r: dict, sections: list[tuple[str, list[str]]]) -> str:
     out = [
         f"═══ {r['name'] or r['ticker']} ({r['ticker']}) — company walkthrough ═══",
-        f"Source: {r['source']} · as of {r['as_of']}"
-        + ("  [SAMPLE DATA — not live]" if r["source"] == "fixture" else ""),
+        analyze._source_line(r),
         f"Price: {_fmt_money(r.get('price'))}   Market cap: {_fmt_money(r.get('market_cap'))}",
         "",
     ]
@@ -183,12 +187,7 @@ def _render(r: dict, sections: list[tuple[str, list[str]]]) -> str:
             out.append(f"    {ln}")
         if i < len(sections) - 1:
             out.append(ARROW)
-    out += [
-        "",
-        "─" * 60,
-        "Read-only market analysis for research/education. Not investment advice; "
-        "no trades are placed. Verify figures against primary filings before acting.",
-    ]
+    out += ["", *analyze._footer()]
     return "\n".join(out)
 
 
