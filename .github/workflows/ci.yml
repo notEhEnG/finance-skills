@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install test dependencies
+        # Offline suite (fixtures, no yfinance/network). Pinned so a tooling
+        # release can't randomly turn CI red; dependabot proposes the bumps.
+        run: python -m pip install --upgrade pip "pytest==9.0.3" "pytest-cov==7.1.0"
+      - name: Run tests with coverage gate
+        run: python -m pytest tests/ -q --cov=scripts --cov-report=term-missing
+
+  lint:
+    name: lint & type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install tools
+        run: python -m pip install --upgrade pip "ruff==0.15.21" "mypy==2.2.0"
+      - name: Ruff (lint)
+        run: ruff check .
+      # Mypy runs WITHOUT installing the package or its stubs
+      # (ignore_missing_imports = true), so this is name/type checking, not
+      # strict typing. It catches obvious mistakes across dynamic report dicts;
+      # it does not prove full type soundness.
+      - name: Mypy (type-check)
+        run: mypy
+
+  build:
+    name: build & metadata check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Build sdist + wheel and validate
+        run: |
+          python -m pip install --upgrade pip "build==1.5.0" "twine==6.2.0"
+          python -m build
+          python -m twine check dist/*
+      - name: Smoke-test the installed console entry point
+        run: |
+          python -m pip install dist/*.whl
+          finance-skills help
+          python -c "import finance_skills; print(finance_skills.__version__)"

@@ -49,7 +49,7 @@ class TestCompany(unittest.TestCase):
             total_debt=50_000_000, total_cash=None, shares_outstanding=10_000_000,
         )
         r = company.build_company(f, as_json=True)
-        health = " ".join(dict((s["heading"], s["lines"]) for s in r["sections"])["Financial Health"])
+        health = " ".join({s["heading"]: s["lines"] for s in r["sections"]}["Financial Health"])
         self.assertIn("n/a", health.lower())
 
     def test_unavailable_data_is_graceful(self):

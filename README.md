@@ -1,5 +1,6 @@
 # finance-skills
 
+[![CI](https://github.com/notEhEnG/finance-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/notEhEnG/finance-skills/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/finance-skills?color=blue)](https://pypi.org/project/finance-skills/)
 [![Python versions](https://img.shields.io/pypi/pyversions/finance-skills)](https://pypi.org/project/finance-skills/)
 [![License: MIT](https://img.shields.io/pypi/l/finance-skills?color=green)](LICENSE)
@@ -406,8 +407,16 @@ samples, clearly labelled non-live) or the skill will say live data is unavailab
 ## Development
 
 ```bash
-python3 -m pytest tests/ -q     # 118 offline tests (no network needed)
+python -m pip install -e ".[dev]"          # tests + lint + type-check tools
+python -m pytest tests/ -q --cov=scripts   # 125 offline tests + coverage gate
+python -m ruff check .                      # lint
+python -m mypy                              # type-check
 ```
+
+CI (GitHub Actions) runs the suite on Python 3.10–3.13, plus ruff, mypy, and a
+build + install smoke test on every push and PR. Safety guarantees (read-only,
+single network module, no `eval`) are enforced by `tests/test_safety.py` — see
+[`SECURITY.md`](SECURITY.md).
 
 - `tests/test_metrics.py` — regime classification, dual-margin/capex-adjusted
   Rule 40 (locks the CoreWeave/Nebius examples), DCF guards, Altman Z, Piotroski.

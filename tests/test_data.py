@@ -1,4 +1,5 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -61,6 +62,71 @@ class TestStatementOrdering(unittest.TestCase):
     def test_non_date_labels_left_unchanged(self):
         df = pd.DataFrame([[1.0, 2.0]], index=["Total Revenue"], columns=["latest", "prior"])
         self.assertIs(data._order_latest_first(df), df)
+
+
+class TestNumCoercion(unittest.TestCase):
+    def test_num_guards(self):
+        self.assertIsNone(data._num(None))
+        self.assertIsNone(data._num("not-a-number"))
+        self.assertIsNone(data._num(float("nan")))
+        self.assertEqual(data._num("3.5"), 3.5)
+        self.assertEqual(data._num(5), 5.0)
+
+
+class TestFixtureFallback(unittest.TestCase):
+    def test_load_fixture_known_and_unknown(self):
+        self.assertEqual(data.load_fixture("crwv").ticker, "CRWV")  # case-insensitive
+        self.assertIsNone(data.load_fixture("ZZZZ"))
+
+    def test_or_fixture_falls_back_when_live_unavailable(self):
+        # Force the live path to fail (no network in tests) and confirm the
+        # fixture fallback kicks in for a ticker that has one, but not otherwise.
+        orig = data.get_fundamentals
+        data.get_fundamentals = lambda t, use_cache=True: data.Fundamentals(
+            ticker=t.upper(), available=False, error="forced-unavailable")
+        try:
+            self.assertEqual(data.get_fundamentals_or_fixture("CRWV").source, "fixture")
+            self.assertFalse(data.get_fundamentals_or_fixture("ZZZZ").available)
+        finally:
+            data.get_fundamentals = orig
+
+
+class TestCache(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig_dir, self._orig_ttl = data.CACHE_DIR, data.CACHE_TTL_SECONDS
+        data.CACHE_DIR = Path(self._tmp.name)
+
+    def tearDown(self):
+        data.CACHE_DIR, data.CACHE_TTL_SECONDS = self._orig_dir, self._orig_ttl
+        self._tmp.cleanup()
+
+    def _sample(self):
+        return data.Fundamentals(ticker="TEST", available=True, revenue=100.0, source="yfinance")
+
+    def test_write_then_read_roundtrip(self):
+        data._write_cache(self._sample())
+        got = data._read_cache("TEST")
+        self.assertIsNotNone(got)
+        self.assertEqual(got.revenue, 100.0)
+
+    def test_get_fundamentals_serves_fresh_cache_without_network(self):
+        data._write_cache(self._sample())
+        got = data.get_fundamentals("TEST", use_cache=True)  # must not hit the network
+        self.assertTrue(got.available)
+        self.assertEqual(got.revenue, 100.0)
+
+    def test_stale_cache_is_ignored(self):
+        data._write_cache(self._sample())
+        data.CACHE_TTL_SECONDS = -1  # everything is now "stale"
+        self.assertIsNone(data._read_cache("TEST"))
+
+    def test_corrupt_cache_is_ignored(self):
+        (data.CACHE_DIR / "TEST.json").write_text("{ not json", encoding="utf-8")
+        self.assertIsNone(data._read_cache("TEST"))
+
+    def test_missing_cache_returns_none(self):
+        self.assertIsNone(data._read_cache("NOPE"))
 
 
 if __name__ == "__main__":

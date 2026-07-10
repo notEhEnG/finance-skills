@@ -21,19 +21,21 @@ from __future__ import annotations
 import json
 import re
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 try:  # installed as the `finance_skills` package…
     from finance_skills import analyze
-    from finance_skills.data import Fundamentals, _FIXTURES, get_fundamentals_or_fixture, load_fixture
+    from finance_skills.data import _FIXTURES, get_fundamentals_or_fixture, load_fixture
 except ImportError:  # …or run directly via `python3 scripts/screen.py` (skill path)
     import analyze
-    from data import Fundamentals, _FIXTURES, get_fundamentals_or_fixture, load_fixture
+    from data import _FIXTURES, get_fundamentals_or_fixture, load_fixture
 
 # Field name -> how to read it out of the engine report. Add here to expose more.
-FIELDS: dict[str, "callable"] = {
+FIELDS: dict[str, Callable[[dict], Any]] = {
     "rule40":       lambda r: (r.get("rule40") or {}).get("preferred_score"),
     "growth":       lambda r: r["derived"].get("revenue_growth_pct"),
     "gross_margin": lambda r: r["derived"].get("gross_margin_pct"),
@@ -63,13 +65,24 @@ class RuleError(ValueError):
     """A malformed screen rule (bad field, operator, or structure)."""
 
 
-def _eval_clause(clause: str, report: dict) -> bool:
+def _parse_clause(clause: str) -> tuple[str, str, float]:
+    """Validate one clause and return (field, op, number), or raise RuleError.
+
+    Pure validation — no report needed. Every clause in a rule is parsed up front
+    (see `evaluate`) so a valid-looking prefix can never mask a malformed or
+    hostile clause behind short-circuit evaluation.
+    """
     m = _CLAUSE_RE.match(clause)
     if not m:
         raise RuleError(f"can't parse clause: {clause!r} — expected `field op number`")
     field, op, num = m.group(1), m.group(2), float(m.group(3))
     if field not in FIELDS:
         raise RuleError(f"unknown field {field!r}. Known: {', '.join(sorted(FIELDS))}")
+    return field, op, num
+
+
+def _eval_clause(clause: str, report: dict) -> bool:
+    field, op, num = _parse_clause(clause)
     value = FIELDS[field](report)
     if value is None:
         return False  # missing data fails the clause, never silently passes
@@ -81,17 +94,25 @@ def evaluate(rule: str, report: dict) -> bool:
 
     `and` binds tighter than `or` (standard precedence): the rule is a disjunction
     of conjunctions. No parentheses — deliberately tiny.
+
+    Fail-closed: the WHOLE rule is parsed and validated before any clause is
+    evaluated, so a malformed or injection-shaped clause anywhere raises RuleError
+    rather than being skipped by short-circuiting.
     """
     if not rule.strip():
         raise RuleError("empty rule")
-    for or_group in re.split(r"\bor\b", rule):
-        if all(_eval_clause(c, report) for c in re.split(r"\band\b", or_group)):
+    or_groups = [re.split(r"\band\b", g) for g in re.split(r"\bor\b", rule)]
+    for group in or_groups:                    # validate everything first
+        for clause in group:
+            _parse_clause(clause)
+    for group in or_groups:                    # then evaluate, short-circuit ok
+        if all(_eval_clause(c, report) for c in group):
             return True
     return False
 
 
 def screen(rule: str, tickers: list[str], use_fixture: bool = False) -> dict:
-    results = []
+    results: list[dict[str, Any]] = []
     for ticker in tickers:
         f = load_fixture(ticker) if use_fixture else get_fundamentals_or_fixture(ticker)
         if f is None or not getattr(f, "available", False):

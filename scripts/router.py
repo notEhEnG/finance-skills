@@ -193,6 +193,9 @@ def route(text: str) -> Route:
     if first:
         res = resolve(first[0])
         if res.method in ("exact", "alias"):
+            # exact/alias always carry a command — assert the invariant resolve()
+            # guarantees rather than re-testing it defensively.
+            assert res.command is not None
             return Route(text, res.command, [(res.command, first[0])], "verb")
     return Route(text, None, [], "none")
 

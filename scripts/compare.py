@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -54,7 +55,7 @@ def _lev_cell(r: dict) -> str:
 
 
 # (row label, cell-from-report) — the curated comparison set. Order = story order.
-ROWS: list[tuple[str, "callable"]] = [
+ROWS: list[tuple[str, Callable[[dict], str]]] = [
     ("Price",              lambda r: _fmt_money(r.get("price"))),
     ("Market cap",         lambda r: _fmt_money(r.get("market_cap"))),
     ("Revenue growth",     lambda r: _pct(r["derived"].get("revenue_growth_pct"))),
@@ -81,7 +82,7 @@ def build_compare(reports: list[dict], as_json: bool = False):
 
 def _render(reports: list[dict]) -> str:
     tickers = [r["ticker"] for r in reports]
-    label_w = max(len(l) for l, _ in ROWS)
+    label_w = max(len(lbl) for lbl, _ in ROWS)
     # Size each column to the widest of its ticker header and every cell it holds,
     # so a wide value like "net cash (4.88x)" can't shove the row out of alignment.
     cell_widths = [len(fn(r)) for _, fn in ROWS for r in reports]

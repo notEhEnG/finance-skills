@@ -7,7 +7,7 @@ name = "finance-skills"
 version = "0.3.0"
 description = "Analyst-style equity research over one shared engine: segment-aware Rule of 40, DCF, red flags, screening — read-only, not investment advice."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Bryan" }]
@@ -20,6 +20,9 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = ["yfinance>=0.2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.5", "mypy>=1.8", "build>=1", "twine>=5"]
 
 [project.urls]
 Homepage = "https://github.com/notEhEnG/finance-skills"
@@ -36,3 +39,43 @@ package-dir = { "finance_skills" = "scripts" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+src = ["scripts", "tests"]
+
+[tool.ruff.lint]
+# Pragmatic, non-bikeshedding rule set: real bugs (F, B), modernisation (UP),
+# imports (I), and common correctness lints (E). We deliberately allow the
+# private cross-module imports the "one engine, many views" design relies on.
+select = ["E", "F", "I", "B", "UP", "C4"]
+ignore = [
+    "E501",  # line length is handled by the formatter, not enforced as an error
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests reach into private helpers (_fixtures, _entry) on purpose.
+"tests/*" = ["E402"]
+# Modules insert their dir on sys.path before importing siblings (skill path).
+"scripts/*" = ["E402"]
+
+[tool.mypy]
+# Lenient by intent: yfinance/pandas ship no type stubs, and the engine passes
+# dynamic dicts between views. We type-check for obvious mistakes, not purity.
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+files = ["scripts"]
+
+[tool.coverage.run]
+source = ["scripts"]
+omit = ["scripts/_entry.py"]
+
+[tool.coverage.report]
+# A floor the suite clears with headroom (total ~82%), so coverage can only go
+# up. The IO shell (data.py) is deliberately tested offline for its pure paths —
+# cache, coercion, fixture fallback — rather than left soft behind the average.
+fail_under = 80
+show_missing = true

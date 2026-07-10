@@ -1,0 +1,50 @@
+name: Bug report
+description: Something computed the wrong number, crashed, or misbehaved
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! This is read-only research software — please do
+        **not** include any brokerage credentials or account details.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "Output of `pip show finance-skills` (or the git commit)."
+      placeholder: "0.3.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: How were you using it?
+      options:
+        - Installed package / console command (finance-skills ...)
+        - Agent skill (python3 scripts/...)
+        - Imported as a library (import finance_skills)
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact command/ticker and whether you used --fixture.
+      placeholder: |
+        $ finance-skills route "is NBIS a value trap?"
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I verified this isn't a data-source (yfinance) outage by trying `--fixture`.
+        - label: I'm not reporting investment advice — I understand this is research software.
