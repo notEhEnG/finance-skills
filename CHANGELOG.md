@@ -6,13 +6,34 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-11
+
+### Added
+- **`brief` — default answer-shaped stack** (`scripts/brief.py`): identity →
+  regime/Rule of 40 → valuation → solvency → top red flags → `gaps[]` →
+  disclaimer. Text + `--json` for agents.
+- **Single verb registry** (`VERBS` in `router.py`) drives help, Core/Lens,
+  and CLI dispatch. `route()` **always** returns a verb (default `brief`).
+- **CLI dispatch**: `finance-skills brief NBIS`, bare `finance-skills NBIS`,
+  and `finance-skills semiconductor CRWV` run real modules (not resolve-only).
+- `redflags.flags_for(report, limit=…)` — public, severity-sorted; brief uses it.
+- `data.normalize_ticker` / `load_for_cli` — shared CLI ticker boundary.
+
 ### Fixed
+- **CLI verb-typo dispatch.** A mistyped verb with a ticker (`valuatoin NBIS`)
+  was treated as a ticker and the real ticker dropped; a fuzzy verb now wins over
+  the ticker fallback only when a later argument looks like the ticker.
 - **Path traversal on the cache write surface.** A ticker like `../evil` was
   interpolated into a cache filename and could write outside the cache directory.
   Tickers are now validated at the IO boundary (`_normalize_ticker`) and
   `_cache_path` refuses any path resolving outside `CACHE_DIR`. Regression-tested.
 
-### Added
+### Changed
+- Help / CANONICAL trimmed: removed unbuilt verbs (`rank`, `portfolio`, `news`,
+  `earnings`, bare banking/REIT/… engines). Agent contract is answer-first +
+  fail-closed guided gaps (see `SKILL.md`).
+
+### Added (OSS hardening)
 - Continuous integration (GitHub Actions): pytest matrix on Python 3.10–3.13,
   ruff lint, mypy type-check, and a build + install smoke test.
 - `SECURITY.md` and `tests/test_safety.py` that **enforce** the read-only
@@ -30,7 +51,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Trusted-publishing release workflow (PyPI OIDC — no stored token).
 - `[dev]` optional-dependency group.
 
-### Changed
+### Changed (OSS hardening)
 - **Minimum Python is now 3.10** (was 3.9). Python 3.9 reached end-of-life in
   October 2025 and no longer receives security fixes; dropping it lets CI, ruff's
   target, and mypy's checked version all agree on one supported floor. This is a
@@ -52,6 +73,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Verb-first CLI over the shared engine; segment-aware Rule of 40; DCF; EV/EBITDA;
   fail-closed net-debt handling; offline fixtures and tests. See the git history.
 
-[Unreleased]: https://github.com/notEhEnG/finance-skills/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/notEhEnG/finance-skills/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/notEhEnG/finance-skills/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/notEhEnG/finance-skills/releases/tag/v0.3.0
 [0.2.1]: https://github.com/notEhEnG/finance-skills/releases/tag/v0.2.1

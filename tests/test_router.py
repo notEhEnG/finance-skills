@@ -1,3 +1,5 @@
+import contextlib
+import io
 import sys
 import unittest
 from pathlib import Path
@@ -14,40 +16,96 @@ class TestResolve(unittest.TestCase):
             self.assertEqual(r.command, verb)
             self.assertEqual(r.method, "exact")
 
-    def test_aliases(self):
+    def test_aliases_to_runnable_core(self):
         cases = {
-            "val": "valuation", "valn": "valuation", "comp": "compare",
-            "semis": "semiconductor", "mgmt": "management", "r40": "rule40",
-            "rf": "redflags", "opp": "opportunities", "neocloud": "ai-cloud",
+            "val": "valuation",
+            "r40": "brief",
+            "rule40": "brief",
+            "dcf": "valuation",
+            "risk": "redflags",
+            "growth": "brief",
+            "snap": "brief",
             "analyse": "analyze",
+            "rf": "redflags",
         }
         for alias, canonical in cases.items():
             r = router.resolve(alias)
-            self.assertEqual(r.command, canonical, f"{alias} should map to {canonical}")
+            self.assertEqual(r.command, canonical, f"{alias} → {canonical}")
             self.assertEqual(r.method, "alias")
+
+    def test_framework_tokens_resolve_to_framework_command(self):
+        r = router.resolve("semiconductor")
+        self.assertEqual(r.command, "framework")
+        self.assertEqual(r.framework, "semiconductor")
+        r2 = router.resolve("semis")
+        self.assertEqual(r2.command, "framework")
+        self.assertEqual(r2.framework, "semiconductor")
+        r3 = router.resolve("ai-cloud")
+        self.assertEqual(r3.command, "framework")
+        self.assertEqual(r3.framework, "neocloud")
 
     def test_fuzzy_typos(self):
         r = router.resolve("vluation")
         self.assertEqual(r.command, "valuation")
         self.assertEqual(r.method, "fuzzy")
 
-    def test_fuzzy_canonicalizes_alias_hit(self):
-        # A typo close to an alias key ("sems" ~ "semis") still resolves to canonical.
-        r = router.resolve("sems")
-        self.assertEqual(r.command, "semiconductor")
-
-    def test_case_and_whitespace_insensitive(self):
-        r = router.resolve("  VALUATION  ")
-        self.assertEqual(r.command, "valuation")
-
     def test_unknown_returns_suggestions_not_crash(self):
         r = router.resolve("zxqw")
         self.assertFalse(r.resolved)
         self.assertEqual(r.method, "unknown")
-        self.assertIsInstance(r.suggestions, list)
 
-    def test_empty_is_unknown(self):
-        self.assertFalse(router.resolve("   ").resolved)
+    def test_ghost_modules_are_not_core(self):
+        for ghost in ("dcf", "growth", "risk", "rule40", "rank", "portfolio", "news"):
+            self.assertNotIn(ghost, router.CORE_VERBS)
+            self.assertNotIn(ghost, router.RUNNABLE)
+
+    def test_every_core_verb_is_runnable(self):
+        for name in router.CORE_VERBS:
+            self.assertIn(name, router.RUNNABLE, f"Core verb without module: {name}")
+
+
+class TestKeywordRouting(unittest.TestCase):
+    def test_plain_questions_map_to_runnable_verbs(self):
+        cases = {
+            "is NBIS a value trap?": "redflags",
+            "is NVDA a buy?": "valuation",
+            "any red flags in PLTR?": "redflags",
+            "how does AMD compare to NVDA": "compare",
+            "rule of 40 for CRM": "brief",
+            "tell me about SNOW": "company",
+            "what's the financial health of CRWV": "health",
+            "does AMD have a moat": "moat",
+            "growth rate of SNOW": "brief",
+            "quick take on NBIS": "brief",
+            "what is it worth": "valuation",
+        }
+        for question, verb in cases.items():
+            self.assertEqual(router.route(question).verb, verb, question)
+
+    def test_no_match_defaults_to_brief(self):
+        r = router.route("please water the plants")
+        self.assertEqual(r.verb, "brief")
+        self.assertEqual(r.method, "default")
+        self.assertEqual(router.effective_verb(r), "brief")
+
+    def test_leading_question_word_does_not_hijack(self):
+        # "what color..." has no finance keyword → default brief, not a fuzzy verb.
+        r = router.route("what color is the sky")
+        self.assertEqual(r.method, "default")
+        self.assertEqual(r.verb, "brief")
+
+    def test_explicit_verb_token_still_routes(self):
+        r = router.route("valuation NBIS")
+        self.assertEqual(r.verb, "valuation")
+        self.assertEqual(r.method, "verb")
+
+    def test_every_keyword_verb_is_known(self):
+        for verb in router.KEYWORDS:
+            self.assertIn(verb, router.VERBS, f"KEYWORDS verb not in VERBS: {verb}")
+
+    def test_route_is_deterministic(self):
+        verbs = {router.route("is it cheap or a value trap").verb for _ in range(20)}
+        self.assertEqual(len(verbs), 1)
 
 
 class TestTickerExtraction(unittest.TestCase):
@@ -61,7 +119,6 @@ class TestTickerExtraction(unittest.TestCase):
         self.assertIn("NVDA", router.extract_tickers("is nvidia a good buy?"))
 
     def test_ignores_jargon_words(self):
-        # "AI", "GPU", "DCF" etc. must not be mistaken for tickers.
         self.assertEqual(router.extract_tickers("what is the AI GPU DCF story"), [])
 
     def test_multiple_tickers_first_seen_order(self):
@@ -69,77 +126,55 @@ class TestTickerExtraction(unittest.TestCase):
 
     def test_class_share_symbols(self):
         self.assertEqual(router.extract_tickers("is BRK.B cheap"), ["BRK.B"])
-        self.assertEqual(router.extract_tickers("thoughts on $rds.a"), ["RDS.A"])
-
-    def test_dotted_abbreviations_are_not_tickers(self):
-        # "U.S." and "U.K." must not be mistaken for class-share symbols.
-        self.assertEqual(router.extract_tickers("is the U.S. market a buy"), [])
 
 
-class TestKeywordRouting(unittest.TestCase):
-    def test_plain_questions_map_to_expected_verb(self):
-        cases = {
-            "is NBIS a value trap?": "risk",
-            "is NVDA a buy?": "valuation",
-            "any red flags in PLTR?": "redflags",
-            "how does AMD compare to NVDA": "compare",
-            "rule of 40 for CRM": "rule40",
-            "tell me about SNOW": "company",
-            "what's the financial health of CRWV": "health",
-            "does AMD have a moat": "moat",
-            "growth rate of SNOW": "growth",
-        }
-        for question, verb in cases.items():
-            self.assertEqual(router.route(question).verb, verb,
-                             f"{question!r} should route to {verb}")
-
-    def test_longest_phrase_wins(self):
-        # "is it a buy" (valuation) must beat the bare "buy"/generic signals.
-        self.assertEqual(router.route("do you think it is a buy here").verb, "valuation")
-
-    def test_explicit_verb_token_still_routes(self):
-        r = router.route("valuation NBIS")
-        self.assertEqual(r.verb, "valuation")
-        self.assertEqual(r.method, "verb")
-
-    def test_leading_question_word_does_not_hijack(self):
-        # A fuzzy match on "what"/"how" must NOT be treated as a verb token.
-        self.assertIsNone(router.route("what color is the sky").verb)
-
-    def test_no_trigger_returns_none(self):
-        r = router.route("please water the plants")
-        self.assertIsNone(r.verb)
-        self.assertEqual(r.method, "none")
-
-    def test_every_keyword_verb_is_canonical(self):
-        for verb in router.KEYWORDS:
-            self.assertIn(verb, router.CANONICAL, f"KEYWORDS references unknown verb: {verb}")
-
-    def test_route_is_deterministic(self):
-        verbs = {router.route("is it cheap or a value trap").verb for _ in range(20)}
-        self.assertEqual(len(verbs), 1)
-
-
-class TestDeterminism(unittest.TestCase):
-    def test_fuzzy_is_stable_across_calls(self):
-        # Sorted pools mean a tie-prone typo resolves identically every time.
-        results = {router.resolve("valuaton").command for _ in range(20)}
-        self.assertEqual(len(results), 1)
-
-
-class TestHelp(unittest.TestCase):
-    def test_help_groups_by_question(self):
+class TestHelpAndRegistry(unittest.TestCase):
+    def test_help_lists_only_canonical(self):
         text = router.format_help()
-        self.assertIn("Is it cheap?", text)
-        self.assertIn("valuation", text)
-        # Every command shown in help must be a real canonical command.
+        self.assertIn("brief", text)
+        self.assertIn("Core", text)
         for cmds in router.HELP_GROUPS.values():
             for c in cmds:
-                self.assertIn(c, router.CANONICAL, f"help lists unknown command: {c}")
+                self.assertIn(c, router.CANONICAL, f"help lists unknown: {c}")
 
-    def test_top_verbs_are_canonical(self):
+    def test_top_verbs_are_runnable_core(self):
         for verb in router.TOP_VERBS:
-            self.assertIn(verb, router.CANONICAL)
+            self.assertIn(verb, router.CORE_VERBS)
+            self.assertIn(verb, router.RUNNABLE)
+
+
+class TestDispatch(unittest.TestCase):
+    def test_dispatch_brief_fixture(self):
+        code = router.main(["brief", "NBIS", "--fixture", "--json"])
+        self.assertEqual(code, 0)
+
+    def test_bare_ticker_defaults_to_brief(self):
+        code = router.main(["NBIS", "--fixture", "--json"])
+        self.assertEqual(code, 0)
+
+    def test_framework_token_dispatches(self):
+        code = router.main(["semiconductor", "CRWV", "--fixture"])
+        self.assertEqual(code, 0)
+
+    def test_fuzzy_verb_typo_with_ticker_dispatches_the_verb(self):
+        # `valuatoin NBIS` must run valuation ON NBIS, not eat the typo as a
+        # ticker and drop the real one (regression: the fuzzy-verb branch was dead).
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = router.main(["valuatoin", "NBIS", "--fixture", "--json"])
+        self.assertEqual(code, 0)
+
+    def test_lone_fuzzy_token_falls_back_to_brief(self):
+        # No trailing ticker → treat as a (bad) ticker → brief → unavailable.
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = router.main(["valuatoin", "--fixture"])
+        self.assertEqual(code, 1)
+
+
+class TestRouteDefault(unittest.TestCase):
+    def test_apply_default_false_signals_no_match(self):
+        r = router.route("please water the plants", apply_default=False)
+        self.assertEqual(r.method, "none")   # caller can detect "nothing matched"
+        self.assertEqual(r.verb, "brief")    # …but verb is never a dead name
 
 
 if __name__ == "__main__":

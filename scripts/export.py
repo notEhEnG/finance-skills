@@ -22,17 +22,19 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 try:  # installed as the `finance_skills` package…
-    from finance_skills import analyze, health, redflags, valuation
+    from finance_skills import analyze, brief, health, redflags, valuation
     from finance_skills.data import Fundamentals, get_fundamentals_or_fixture, load_fixture
 except ImportError:  # …or run directly via `python3 scripts/export.py` (skill path)
     import analyze
+    import brief
     import health
     import redflags
     import valuation
     from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
 
-# verb -> (text_builder, json_builder). Both take (Fundamentals, as_json=bool).
+# verb -> builder(Fundamentals, as_json=bool).
 BUILDERS = {
+    "brief":     brief.build_brief,
     "analyze":   analyze.build_report,
     "valuation": valuation.build_valuation,
     "health":    health.build_health,

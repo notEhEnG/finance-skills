@@ -44,7 +44,13 @@ class TestConsoleEntry(unittest.TestCase):
     def test_route_subcommand_via_entry(self):
         code, text = self._run("route", "is NBIS a value trap?")
         self.assertEqual(code, 0)
-        self.assertIn("risk", text)
+        self.assertIn("redflags", text)
+
+    def test_brief_dispatch_via_entry(self):
+        code, text = self._run("brief", "NBIS", "--fixture")
+        self.assertEqual(code, 0)
+        self.assertIn("brief", text.lower())
+        self.assertIn("NBIS", text)
 
 
 if __name__ == "__main__":

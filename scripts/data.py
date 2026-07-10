@@ -36,13 +36,21 @@ CACHE_TTL_SECONDS = 60 * 60 * 6  # 6h; fundamentals change slowly
 _TICKER_RE = re.compile(r"^[A-Z0-9][A-Z0-9._-]{0,15}$")
 
 
-def _normalize_ticker(ticker: str) -> str:
-    """Upper-case and validate a ticker, or raise ValueError. Callers that must
-    never raise (e.g. get_fundamentals) catch this and return unavailable."""
+def normalize_ticker(ticker: str) -> str:
+    """Upper-case and validate a ticker, or raise ValueError.
+
+    Public boundary helper — every CLI door should use this (or `load_for_cli`)
+    so path-unsafe symbols never reach the cache filename. Callers that must
+    never raise (e.g. get_fundamentals) catch ValueError and return unavailable.
+    """
     t = ticker.strip().upper()
     if not _TICKER_RE.fullmatch(t):
         raise ValueError(f"invalid ticker: {ticker!r}")
     return t
+
+
+# Back-compat private alias (tests / older call sites).
+_normalize_ticker = normalize_ticker
 
 
 @dataclass
@@ -296,7 +304,11 @@ _FIXTURES = {
 
 def load_fixture(ticker: str) -> Fundamentals | None:
     """Return a synthetic sample record for offline demos/tests, or None."""
-    return _FIXTURES.get(ticker.strip().upper())
+    try:
+        t = normalize_ticker(ticker)
+    except ValueError:
+        return None
+    return _FIXTURES.get(t)
 
 
 def get_fundamentals_or_fixture(ticker: str, use_cache: bool = True) -> Fundamentals:
@@ -309,3 +321,16 @@ def get_fundamentals_or_fixture(ticker: str, use_cache: bool = True) -> Fundamen
     if fixture is not None:
         return fixture
     return live  # unavailable, with its error message intact
+
+
+def load_for_cli(ticker: str, *, use_fixture: bool = False) -> Fundamentals:
+    """Validate ticker then load fixture or live/fixture-fallback. Never raises."""
+    try:
+        t = normalize_ticker(ticker)
+    except ValueError as exc:
+        return Fundamentals(ticker=ticker.strip().upper(), available=False, error=str(exc))
+    if use_fixture:
+        return load_fixture(t) or Fundamentals(
+            ticker=t, available=False, error="no fixture for this ticker"
+        )
+    return get_fundamentals_or_fixture(t)

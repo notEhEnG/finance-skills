@@ -87,30 +87,37 @@ python3 scripts/router.py route "how does AMD compare to NVDA"  # -> compare
 | If the question sounds like… | Trigger phrases (examples) | Routes to |
 |---|---|---|
 | is it cheap / a buy | `is it a buy`, `overvalued`, `undervalued`, `fair value`, `should i buy`, `cheap` | `valuation` |
-| is it safe | `is it safe`, `value trap`, `blow up`, `go bankrupt`, `too much debt`, `risky` | `risk` |
+| is it safe | `is it safe`, `value trap`, `blow up`, `go bankrupt`, `too much debt`, `risky` | `redflags` |
 | anything wrong | `red flag(s)`, `warning sign`, `going concern`, `anything to worry` | `redflags` |
 | can it survive | `financial health`, `balance sheet`, `cash runway`, `solvency`, `self-funding` | `health` |
-| is it growing | `growth rate`, `top line`, `is it growing`, `decelerating`, `accelerating` | `growth` |
-| does it have an edge | `a moat`, `competitive advantage`, `pricing power`, `defensible` | `moat` |
-| what's it worth | `intrinsic value`, `discounted cash flow`, `fair price`, `dcf`, `worth` | `dcf` |
-| is growth efficient | `rule of 40`, `rule40`, `r40` | `rule40` |
+| is it growing | `growth rate`, `top line`, `is it growing`, `decelerating`, `accelerating` | `brief` |
+| does it have an edge | `a moat`, `competitive advantage`, `pricing power`, `defensible` | `moat` (lens) |
+| what's it worth | `intrinsic value`, `discounted cash flow`, `fair price`, `dcf`, `worth` | `valuation` |
+| is growth efficient | `rule of 40`, `rule40`, `r40` | `brief` |
 | which is better | `compare`, `versus`, `vs`, `head-to-head`, `better than` | `compare` |
 | tell me everything | `tell me about`, `walk me through`, `full picture`, `deep dive` | `company` |
 
-`route` returns nothing when no phrase matches (then the agent falls back to the
-semantic routing table); a leading question word like *what*/*how* never hijacks
-routing. The map lives in `KEYWORDS` in [`scripts/router.py`](scripts/router.py).
+`route` returns nothing when no phrase matches — the product **default is
+`brief`** (answer-shaped stack). Use `router.py route --default "…"` or
+`effective_verb`. A leading *what*/*how* never hijacks routing. See
+[`scripts/router.py`](scripts/router.py) and [`SKILL.md`](SKILL.md).
+
+**Core vs Lens:** Core verbs are engine-backed. `moat` / `fiveforces` are
+**Lens** (qualitative evidence from engine numbers — not computed scores).
+Sector words (`saas`, `neocloud`, `semiconductor`, `ai-cloud`) dispatch to
+`framework <name>`, not fake standalone modules.
 
 ## Slash commands
 
-Plain English always works (Layer 1). But the **verbs are the primary interface** —
-a polished CLI over one shared engine, so numbers never diverge across commands.
+Plain English always works (Layer 1). **Verbs are the primary interface** —
+one shared engine so numbers never diverge.
 
 | Command | Answers | Backed by |
 |---|---|---|
-| `/finance-skills <question>` | anything — routes to the right lens | `analyze` + intent routing |
+| `/finance-skills <question>` | routes, or **`brief` by default** | `scripts/brief.py` + router |
+| `/finance-skills brief <ticker>` | default stack: regime, Rule 40, valuation, solvency, flags, gaps | `scripts/brief.py` |
 | `/finance-skills company <ticker>` | "tell me about this company" — a guided walkthrough | `scripts/company.py` |
-| `/finance-skills analyze <ticker>` | "should I invest?" end-to-end (flagship) | `scripts/analyze.py` |
+| `/finance-skills analyze <ticker>` | dense flagship dump | `scripts/analyze.py` |
 | `/finance-skills framework <name> <ticker>` | "run the SaaS / neocloud / semis lens" | `scripts/framework.py` |
 | `/finance-skills valuation <ticker>` | "is it cheap?" | DCF + EV/EBITDA + Rule 40 |
 | `/finance-skills dcf <ticker>` | "what's it worth?" | DCF slice of `analyze` |
@@ -119,8 +126,8 @@ a polished CLI over one shared engine, so numbers never diverge across commands.
 | `/finance-skills risk <ticker>` | "what could go wrong?" | leverage, FCF, dilution, capex gap |
 | `/finance-skills redflags <ticker>` | "any warning signs?" | `scripts/redflags.py` (severity-ranked flags) |
 | `/finance-skills health <ticker>` | "can it survive?" | `scripts/health.py` (leverage, runway, dilution) |
-| `/finance-skills moat <ticker>` | "does it have a durable edge?" | margins vs peers + `references/` |
-| `/finance-skills fiveforces <ticker>` | "how good is the industry structure?" | Porter, applied to engine evidence |
+| `/finance-skills moat <ticker>` | "does it have a durable edge?" (**Lens**) | qualitative + engine evidence |
+| `/finance-skills fiveforces <ticker>` | industry structure (**Lens**) | Porter + engine evidence |
 | `/finance-skills compare <a> <b> [...]` | "which is better?" | `scripts/compare.py` (side-by-side table) |
 | `/finance-skills screen "<rule>" [tickers]` | "which pass this filter?" | `scripts/screen.py` (`field op value`) |
 | `/finance-skills watchlist add\|list\|run <verb>` | "track a set, run any verb across it" | `scripts/watchlist.py` |
@@ -408,7 +415,7 @@ samples, clearly labelled non-live) or the skill will say live data is unavailab
 
 ```bash
 python -m pip install -e ".[dev]"          # tests + lint + type-check tools
-python -m pytest tests/ -q --cov=scripts   # 125 offline tests + coverage gate
+python -m pytest tests/ -q --cov=scripts   # offline tests + coverage gate
 python -m ruff check .                      # lint
 python -m mypy                              # type-check
 ```
