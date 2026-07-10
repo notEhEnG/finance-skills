@@ -119,6 +119,14 @@ class TestTickerExtraction(unittest.TestCase):
     def test_explicit_symbol_in_question(self):
         self.assertEqual(router.extract_tickers("Do you think NBIS is a buy?"), ["NBIS"])
 
+    def test_lowercase_symbol_in_question(self):
+        # Agents often pass the user string as typed: "is nbis a buy?"
+        self.assertEqual(router.extract_tickers("is nbis a buy?"), ["NBIS"])
+        rr = router.route_request("is nbis a buy?")
+        self.assertEqual(rr.intent, "valuation")
+        self.assertEqual(rr.tickers, ["NBIS"])
+        self.assertFalse(rr.needs_clarification)
+
     def test_dollar_prefixed(self):
         self.assertEqual(router.extract_tickers("is $nvda overvalued"), ["NVDA"])
 
@@ -133,6 +141,7 @@ class TestTickerExtraction(unittest.TestCase):
 
     def test_class_share_symbols(self):
         self.assertEqual(router.extract_tickers("is BRK.B cheap"), ["BRK.B"])
+        self.assertEqual(router.extract_tickers("is brk.b cheap"), ["BRK.B"])
 
 
 class TestHelpAndRegistry(unittest.TestCase):

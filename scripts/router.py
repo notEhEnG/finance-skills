@@ -330,33 +330,36 @@ def route_request(text: str) -> RouteResult:
                 ],
             )
 
-    # --- learn (concept only, no ticker) ---
-    if not tickers:
+    # --- learn (concept education). Prefer when a learn phrase matches and there
+    # is no *company* ticker. Concept tokens (RULE from "Rule of 40", FREE/CASH
+    # from "free cash flow") are stripped so pedagogy does not block learn.
+    def _learn_hit() -> str | None:
         for phrase in _LEARN_PHRASES:
             if phrase in lowered:
-                matched_terms.append(phrase)
-                return RouteResult(
-                    schema_version=ROUTE_SCHEMA_VERSION,
-                    original_query=original,
-                    intent="learn",
-                    confidence=0.92,
-                    matched_terms=matched_terms,
-                    method="learn",
-                    allowed_next_actions=["run_learn", "no_ticker_required"],
-                )
-        # "rule of 40" / r40 alone without ticker → learn (not empty brief)
-        for phrase in ("rule of 40", "rule of forty", "rule40", " r40 "):
+                return phrase
+        for phrase in ("rule of 40", "rule of forty", "rule40"):
             if phrase in lowered or lowered.strip() in ("r40", "rule40"):
-                matched_terms.append(phrase.strip())
-                return RouteResult(
-                    schema_version=ROUTE_SCHEMA_VERSION,
-                    original_query=original,
-                    intent="learn",
-                    confidence=0.88,
-                    matched_terms=matched_terms,
-                    method="learn",
-                    allowed_next_actions=["run_learn", "no_ticker_required"],
-                )
+                return phrase
+        return None
+
+    learn_phrase = _learn_hit()
+    if learn_phrase is not None:
+        concept_words = {w.upper() for w in re.findall(r"[A-Za-z]+", learn_phrase)}
+        company_tickers = [t for t in tickers if t not in concept_words]
+        if not company_tickers:
+            matched_terms.append(learn_phrase.strip())
+            return RouteResult(
+                schema_version=ROUTE_SCHEMA_VERSION,
+                original_query=original,
+                intent="learn",
+                tickers=[],
+                confidence=0.92,
+                matched_terms=matched_terms,
+                method="learn",
+                allowed_next_actions=["run_learn", "no_ticker_required"],
+            )
+        # e.g. "rule of 40 for CRM" — keep CRM and fall through to brief keyword
+        tickers = company_tickers
 
     # --- keyword index (longest phrase first) ---
     keyword_hits: list[tuple[str, str]] = []
@@ -532,10 +535,35 @@ _TICKER_STOPWORDS = {
     "CEO", "CFO", "EPS", "FCF", "PE", "PEG", "ROE", "ROA", "ROIC", "GPU", "CPU",
     "ETF", "IPO", "YOY", "TTM", "DCF", "EV", "EBITDA", "SAAS", "ARR", "RPO",
     "Q1", "Q2", "Q3", "Q4", "YOLO", "OK", "VS", "AND", "THE", "FOR", "BUY",
+    # Common English (case-insensitive bare scan would otherwise treat as tickers)
+    "SELL", "HOLD", "ALL", "ANY", "ARE", "BUT", "CAN", "DID", "GET", "HAS",
+    "HER", "HIM", "HIS", "HOW", "ITS", "LET", "MAY", "NEW", "NOT", "NOW",
+    "OLD", "OUR", "OUT", "OWN", "SAY", "SHE", "TOO", "USE", "WHO", "WHY",
+    "YOU", "BAD", "BIG", "FEW", "FAR", "LOW", "TOP", "RUN", "SET", "TRY",
+    "WAY", "YET", "ALSO", "BACK", "BEST", "BOTH", "CALL", "CAME", "COME",
+    "EACH", "EVEN", "EVER", "FIND", "FROM", "GIVE", "GOOD", "HAVE", "HERE",
+    "HIGH", "INTO", "JUST", "KNOW", "LAST", "LIKE", "LONG", "LOOK", "MADE",
+    "MAKE", "MANY", "MORE", "MOST", "MUCH", "MUST", "NAME", "NEED", "NEXT",
+    "ONLY", "OVER", "PART", "REAL", "SAME", "SEEM", "SHOW", "SOME", "SUCH",
+    "SURE", "TAKE", "TELL", "THAN", "THAT", "THEM", "THEN", "THEY", "THIS",
+    "TIME", "TRUE", "VERY", "WANT", "WELL", "WERE", "WHAT", "WHEN", "WILL",
+    "WITH", "YEAR", "YOUR", "ABOUT", "AFTER", "AGAIN", "BEING", "COULD",
+    "DOING", "EVERY", "FIRST", "FOUND", "GREAT", "MIGHT", "OTHER", "RIGHT",
+    "SHALL", "SINCE", "STILL", "THEIR", "THERE", "THESE", "THING", "THINK",
+    "THOSE", "THREE", "UNDER", "UNTIL", "VALUE", "WHERE", "WHICH", "WHILE",
+    "WORLD", "WOULD", "WRITE", "YEARS", "CHEAP", "PRICE", "STOCK", "SHARE",
+    "MARKET", "TRADE", "RISKY", "SAFER", "QUICK", "BRIEF", "LEARN", "HELP",
+    "RISKS", "FLAGS", "GROW", "GROWN", "FAIR", "RICH", "SAFE", "TRAP",
+    # Pedagogy / concept words (case-insensitive bare scan)
+    "STORY", "RULE", "FORTY", "FREE", "CASH", "FLOW", "MAGIC", "NUMBER",
+    "EXPLAIN", "DEFINE", "TEACH", "MOAT", "FORCE", "FORCES", "ALTMAN",
+    "CAPEX", "NRR", "WORTH", "EDGE",
 }
 
 _EXPLICIT_TICKER_RE = re.compile(r"\$([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)\b")
+# Uppercase-only (legacy) and case-insensitive bare symbols (user often types "nbis").
 _BARE_UPPER_RE = re.compile(r"\b([A-Z]{2,5}\.[A-Z]{1,2}|[A-Z]{1,5})\b")
+_BARE_TICKER_CI_RE = re.compile(r"\b([A-Za-z]{2,5}(?:\.[A-Za-z]{1,2})?)\b")
 _TICKER_SHAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,15}$")
 
 
@@ -544,7 +572,7 @@ def extract_tickers(text: str) -> list[str]:
 
     def add(sym: str):
         sym = sym.upper()
-        if sym and sym not in found:
+        if sym and sym not in found and sym not in _TICKER_STOPWORDS:
             found.append(sym)
 
     for m in _EXPLICIT_TICKER_RE.finditer(text):
@@ -553,10 +581,12 @@ def extract_tickers(text: str) -> list[str]:
     for name, sym in _COMMON_NAMES.items():
         if re.search(rf"\b{re.escape(name)}\b", lowered):
             add(sym)
+    # Prefer explicit ALL-CAPS tokens (classic ticker orthography).
     for m in _BARE_UPPER_RE.finditer(text):
-        tok = m.group(1)
-        if tok not in _TICKER_STOPWORDS and len(tok) >= 2:
-            add(tok)
+        add(m.group(1))
+    # Case-insensitive bare tokens: "nbis", "aapl", "Brk.B" — stopwords filter noise.
+    for m in _BARE_TICKER_CI_RE.finditer(text):
+        add(m.group(1))
     return found
 
 
