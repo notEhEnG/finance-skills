@@ -19,6 +19,10 @@ the build rather than relying on prose:
 - **Untrusted input is parsed, not evaluated.** The `screen` rule language is a
   tiny hand-written parser (`field op value`) that validates the whole rule up
   front; adversarial inputs (e.g. `__import__('os')`) raise, covered by tests.
+- **The one write surface is traversal-guarded.** A ticker is interpolated into a
+  cache filename, so it's untrusted input. It's validated against a strict symbol
+  pattern (`_normalize_ticker`) and the cache path is refused if it would resolve
+  outside the cache directory — so `../evil` can't escape. Regression-tested.
 - **No secrets.** The package reads public market data only; it stores no
   credentials and writes only local files (a 6h cache and optional watchlists).
 

@@ -91,6 +91,45 @@ class TestFixtureFallback(unittest.TestCase):
             data.get_fundamentals = orig
 
 
+class TestTickerTraversal(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig = data.CACHE_DIR
+        # A nested cache dir so an escaping path would land in the temp root.
+        data.CACHE_DIR = Path(self._tmp.name) / "cache"
+
+    def tearDown(self):
+        data.CACHE_DIR = self._orig
+        self._tmp.cleanup()
+
+    def test_normalize_accepts_real_symbols(self):
+        self.assertEqual(data._normalize_ticker("nvda"), "NVDA")
+        self.assertEqual(data._normalize_ticker(" brk.b "), "BRK.B")
+        self.assertEqual(data._normalize_ticker("RDS.A"), "RDS.A")
+
+    def test_normalize_rejects_traversal_and_junk(self):
+        for bad in ["../evil", "a/b", "..", "", "/etc/passwd", "x" * 20, ".hidden", "a\\b"]:
+            with self.assertRaises(ValueError, msg=f"should reject {bad!r}"):
+                data._normalize_ticker(bad)
+
+    def test_cache_path_refuses_to_escape(self):
+        for bad in ["../evil", "a/b", ".."]:
+            with self.assertRaises(ValueError):
+                data._cache_path(bad)
+
+    def test_get_fundamentals_rejects_bad_ticker_without_writing(self):
+        f = data.get_fundamentals("../evil", use_cache=False)  # offline: returns before any fetch
+        self.assertFalse(f.available)
+        self.assertIn("invalid ticker", f.error)
+        # Nothing may be written anywhere under the temp root.
+        leaked = list(Path(self._tmp.name).rglob("*.json"))
+        self.assertEqual(leaked, [], f"a file escaped the cache dir: {leaked}")
+
+    def test_or_fixture_also_rejects_bad_ticker(self):
+        f = data.get_fundamentals_or_fixture("../../etc/passwd", use_cache=False)
+        self.assertFalse(f.available)
+
+
 class TestCache(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()

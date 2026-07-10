@@ -19,6 +19,7 @@ reads public market data.
 from __future__ import annotations
 
 import json
+import re
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -26,6 +27,22 @@ from pathlib import Path
 
 CACHE_DIR = Path(__file__).resolve().parent.parent / ".cache"
 CACHE_TTL_SECONDS = 60 * 60 * 6  # 6h; fundamentals change slowly
+
+# A ticker is interpolated into a cache filename, so it is untrusted input on the
+# one write surface. Constrain it to real symbol characters (letters, digits, and
+# the class/exchange separators . _ -) with an alphanumeric first char — no path
+# separators, no leading dot. This deletes the path-traversal class at the
+# boundary rather than sanitising per call site. BRK.B / RDS.A still pass.
+_TICKER_RE = re.compile(r"^[A-Z0-9][A-Z0-9._-]{0,15}$")
+
+
+def _normalize_ticker(ticker: str) -> str:
+    """Upper-case and validate a ticker, or raise ValueError. Callers that must
+    never raise (e.g. get_fundamentals) catch this and return unavailable."""
+    t = ticker.strip().upper()
+    if not _TICKER_RE.fullmatch(t):
+        raise ValueError(f"invalid ticker: {ticker!r}")
+    return t
 
 
 @dataclass
@@ -73,7 +90,12 @@ def _now_iso() -> str:
 
 
 def _cache_path(ticker: str) -> Path:
-    return CACHE_DIR / f"{ticker.upper()}.json"
+    # Defense-in-depth: even though callers normalize, refuse any path that would
+    # resolve outside CACHE_DIR (a second line against traversal on the write surface).
+    path = CACHE_DIR / f"{_normalize_ticker(ticker)}.json"
+    if path.resolve().parent != CACHE_DIR.resolve():
+        raise ValueError(f"cache path escapes CACHE_DIR for ticker {ticker!r}")
+    return path
 
 
 def _read_cache(ticker: str) -> Fundamentals | None:
@@ -161,7 +183,12 @@ def _col(df, keys, column=0):
 
 def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
     """Fetch and normalise fundamentals for `ticker`. Never raises."""
-    ticker = ticker.strip().upper()
+    try:
+        ticker = _normalize_ticker(ticker)
+    except ValueError as exc:
+        # Reject before any cache read/write — a malformed ticker must never reach
+        # the filesystem path builder (path-traversal guard on the write surface).
+        return Fundamentals(ticker=ticker.strip().upper(), available=False, error=str(exc))
 
     if use_cache:
         cached = _read_cache(ticker)

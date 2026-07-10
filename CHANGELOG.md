@@ -6,6 +6,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **Path traversal on the cache write surface.** A ticker like `../evil` was
+  interpolated into a cache filename and could write outside the cache directory.
+  Tickers are now validated at the IO boundary (`_normalize_ticker`) and
+  `_cache_path` refuses any path resolving outside `CACHE_DIR`. Regression-tested.
+
 ### Added
 - Continuous integration (GitHub Actions): pytest matrix on Python 3.10–3.13,
   ruff lint, mypy type-check, and a build + install smoke test.
