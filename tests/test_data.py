@@ -103,14 +103,14 @@ class TestTickerTraversal(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_normalize_accepts_real_symbols(self):
-        self.assertEqual(data._normalize_ticker("nvda"), "NVDA")
-        self.assertEqual(data._normalize_ticker(" brk.b "), "BRK.B")
-        self.assertEqual(data._normalize_ticker("RDS.A"), "RDS.A")
+        self.assertEqual(data.normalize_ticker("nvda"), "NVDA")
+        self.assertEqual(data.normalize_ticker(" brk.b "), "BRK.B")
+        self.assertEqual(data.normalize_ticker("RDS.A"), "RDS.A")
 
     def test_normalize_rejects_traversal_and_junk(self):
         for bad in ["../evil", "a/b", "..", "", "/etc/passwd", "x" * 20, ".hidden", "a\\b"]:
             with self.assertRaises(ValueError, msg=f"should reject {bad!r}"):
-                data._normalize_ticker(bad)
+                data.normalize_ticker(bad)
 
     def test_cache_path_refuses_to_escape(self):
         for bad in ["../evil", "a/b", ".."]:

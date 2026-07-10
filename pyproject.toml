@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "finance-skills"
-version = "0.4.0"
+version = "0.5.0"
 description = "Analyst-style equity research over one shared engine: segment-aware Rule of 40, DCF, red flags, screening — read-only, not investment advice."
 readme = "README.md"
 requires-python = ">=3.10"

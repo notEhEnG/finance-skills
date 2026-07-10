@@ -12,20 +12,22 @@ clean — an absent balance sheet is not a green light.
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-try:  # installed as the `finance_skills` package…
+if __package__:
     from finance_skills import analyze
-    from finance_skills.analyze import _pct
-    from finance_skills.data import Fundamentals, get_fundamentals_or_fixture, load_fixture
-except ImportError:  # …or run directly via `python3 scripts/redflags.py` (skill path)
+    from finance_skills.cli import run_single_ticker
+    from finance_skills.data import Fundamentals
+    from finance_skills.format import footer, pct, source_line
+else:
     import analyze
-    from analyze import _pct
-    from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
+    from cli import run_single_ticker
+    from data import Fundamentals
+    from format import footer, pct, source_line
 
 HIGH, MED, LOW = "⛔", "⚠", "•"
 _SEV_RANK = {HIGH: 0, MED: 1, LOW: 2}
@@ -34,7 +36,7 @@ _SEV_RANK = {HIGH: 0, MED: 1, LOW: 2}
 def flags_for(report: dict, *, limit: int | None = None) -> list[dict]:
     """Public flag list for a `build_report` dict — sorted high→low severity.
 
-    Used by `redflags` and `brief` (default stack). Prefer this over private
+    Used by `redflags`, `brief`, and `company`. Prefer this over private
     helpers so the default path doesn't depend on underscore APIs.
     """
     d = report["derived"]
@@ -46,16 +48,16 @@ def flags_for(report: dict, *, limit: int | None = None) -> list[dict]:
     fcf_m = d.get("fcf_margin_pct")
     if fcf_m is not None and fcf_m < 0:
         sev = HIGH if fcf_m < -50 else MED
-        add(sev, "Cash burn", f"FCF margin {_pct(fcf_m)} — spends more cash than it earns; depends on funding.")
+        add(sev, "Cash burn", f"FCF margin {pct(fcf_m)} — spends more cash than it earns; depends on funding.")
 
     g = d.get("revenue_growth_pct")
     if g is not None and g < 0:
-        add(HIGH, "Revenue shrinking", f"Revenue down {_pct(g)} YoY — the story is contraction, not growth.")
+        add(HIGH, "Revenue shrinking", f"Revenue down {pct(g)} YoY — the story is contraction, not growth.")
 
     dil = d.get("share_dilution_pct")
     if dil is not None and dil > 5:
         sev = HIGH if dil > 15 else MED
-        add(sev, "Heavy dilution", f"Share count up {_pct(dil)} YoY — existing holders are being diluted.")
+        add(sev, "Heavy dilution", f"Share count up {pct(dil)} YoY — existing holders are being diluted.")
 
     lev = (report.get("leverage") or {}).get("net_debt_to_ebitda")
     if lev is not None and lev >= 3:
@@ -70,7 +72,7 @@ def flags_for(report: dict, *, limit: int | None = None) -> list[dict]:
 
     em = d.get("ebitda_margin_pct")
     if em is not None and em > 100:
-        add(MED, "Distorted EBITDA", f"EBITDA margin {_pct(em)} (>100%) — non-operating items inflate it; trust EV/Sales.")
+        add(MED, "Distorted EBITDA", f"EBITDA margin {pct(em)} (>100%) — non-operating items inflate it; trust EV/Sales.")
 
     if "dcf" not in report and d.get("ev_sales") is not None and d.get("ev_sales") >= 20:
         add(MED, "Priced on hope", f"No positive-FCF DCF and EV/Sales {d['ev_sales']}x — a growth bet, not cash-flow-backed.")
@@ -84,15 +86,10 @@ def flags_for(report: dict, *, limit: int | None = None) -> list[dict]:
     return out
 
 
-def _flags(r: dict) -> list[dict]:
-    """Back-compat alias for flags_for."""
-    return flags_for(r)
-
-
 def build_redflags(f: Fundamentals, as_json: bool = False):
-    report = analyze.build_report(f, as_json=True)
-    if isinstance(report, dict) and not report.get("available", True):
-        return report if as_json else analyze.build_report(f, as_json=False)
+    report = analyze.build_report(f)
+    if not report.get("available", True):
+        return report if as_json else analyze.format_report(report)
     flags = flags_for(report)
     if as_json:
         return {"ticker": report["ticker"], "flag_count": len(flags), "flags": flags}
@@ -102,38 +99,30 @@ def build_redflags(f: Fundamentals, as_json: bool = False):
 def _render(r: dict, flags: list[dict]) -> str:
     out = [
         f"═══ {r['name'] or r['ticker']} ({r['ticker']}) — red flags ═══",
-        analyze._source_line(r),
+        source_line(r),
         "",
     ]
     if not flags:
         out += ["  ✓ No red flags tripped on the fetched fundamentals.",
                 "    (Absence of a flag is not a clean bill of health — qualitative and",
                 "     disclosed-KPI risks aren't visible in the summary financials.)"]
-        out += ["", *analyze._footer()]
+        out += ["", *footer()]
         return "\n".join(out)
 
     width = max(len(x["flag"]) for x in flags)
     for x in flags:
         out.append(f"  {x['severity']} {x['flag'].ljust(width)}   {x['detail']}")
     highs = sum(1 for x in flags if x["severity"] == HIGH)
-    out += ["", f"{len(flags)} flag(s), {highs} high-severity. ⛔ high · ⚠ medium · • watch.", *analyze._footer()]
+    out += ["", f"{len(flags)} flag(s), {highs} high-severity. ⛔ high · ⚠ medium · • watch.", *footer()]
     return "\n".join(out)
 
 
 def main(argv: list[str]) -> int:
-    args = [a for a in argv if not a.startswith("--")]
-    flags = {a for a in argv if a.startswith("--")}
-    if not args:
-        print("usage: python scripts/redflags.py <TICKER> [--fixture] [--json]", file=sys.stderr)
-        return 2
-    ticker = args[0].upper()
-    if "--fixture" in flags:
-        f = load_fixture(ticker) or Fundamentals(ticker=ticker, available=False, error="no fixture for this ticker")
-    else:
-        f = get_fundamentals_or_fixture(ticker)
-    report = build_redflags(f, as_json="--json" in flags)
-    print(json.dumps(report, indent=2) if "--json" in flags else report)
-    return 0 if f.available else 1
+    return run_single_ticker(
+        argv,
+        usage="usage: python scripts/redflags.py <TICKER> [--fixture] [--json]",
+        build=build_redflags,
+    )
 
 
 if __name__ == "__main__":

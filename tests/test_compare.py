@@ -12,7 +12,7 @@ from data import load_fixture
 
 
 def _reports(*tickers):
-    return [analyze.build_report(load_fixture(t), as_json=True) for t in tickers]
+    return [analyze.build_report(load_fixture(t)) for t in tickers]
 
 
 def _exit_code(argv):
@@ -29,8 +29,8 @@ class TestCompare(unittest.TestCase):
 
     def test_numbers_match_the_engine(self):
         # A compare cell must equal the ticker's own engine number (no divergence).
-        rep = analyze.build_report(load_fixture("CRWV"), as_json=True)
-        r = compare.build_compare([rep, analyze.build_report(load_fixture("NBIS"), as_json=True)],
+        rep = analyze.build_report(load_fixture("CRWV"))
+        r = compare.build_compare([rep, analyze.build_report(load_fixture("NBIS"))],
                                   as_json=True)
         growth_row = next(row for row in r["rows"] if row["metric"] == "Revenue growth")
         self.assertIn(f"{rep['derived']['revenue_growth_pct']:.1f}", growth_row["values"]["CRWV"])

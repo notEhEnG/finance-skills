@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import sys
 
-try:  # installed as the `finance_skills` package…
+if __package__:
     from finance_skills import router
-except ImportError:  # …or imported from the in-repo `scripts/` dir (tests, dev)
+else:
     import router
 
 

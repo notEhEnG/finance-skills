@@ -10,7 +10,7 @@ from data import load_fixture
 
 
 def _report(ticker):
-    return analyze.build_report(load_fixture(ticker), as_json=True)
+    return analyze.build_report(load_fixture(ticker))
 
 
 class TestEvaluate(unittest.TestCase):

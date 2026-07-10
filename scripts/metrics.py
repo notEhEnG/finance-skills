@@ -233,6 +233,80 @@ def dcf_intrinsic_value(
     }
 
 
+def dcf_scenarios(
+    fcf: float,
+    base_growth: float,
+    shares_outstanding: float,
+    net_debt: float,
+    *,
+    price: float | None = None,
+    discount_rate: float = 10.0,
+    terminal_growth: float = 3.0,
+    years: int = 10,
+) -> dict:
+    """Bear/base/bull + discount-rate and FCF-conversion sensitivities.
+
+    Pure helper — call only when DCF inputs are already validated (positive FCF,
+    known net debt, shares). Growth rates are percent; FCF conversion multiplies
+    the starting FCF (0.8 / 1.0 / 1.2) without inventing a new cash line.
+    """
+    # Growth scenarios around the base (clamped so bear stays non-absurd).
+    bear_g = max(base_growth - 10.0, min(base_growth * 0.5, base_growth - 3.0))
+    bull_g = min(base_growth + 10.0, 35.0)
+    # If base is already capped near 25, keep bull from exploding past 35.
+
+    def run(g: float, r: float, fcf_mult: float = 1.0) -> dict:
+        res = dcf_intrinsic_value(
+            fcf=fcf * fcf_mult,
+            growth_rate=g,
+            discount_rate=r,
+            terminal_growth=terminal_growth,
+            years=years,
+            shares_outstanding=shares_outstanding,
+            net_debt=net_debt,
+        )
+        ps = res["per_share"]
+        vs_price = None
+        if ps is not None and price is not None and price > 0:
+            vs_price = round((ps / price - 1.0) * 100.0, 1)
+        return {
+            "per_share": ps,
+            "growth_rate": g,
+            "discount_rate": r,
+            "fcf_mult": fcf_mult,
+            "vs_price_pct": vs_price,
+        }
+
+    growth_table = {
+        "bear": run(round(bear_g, 1), discount_rate),
+        "base": run(base_growth, discount_rate),
+        "bull": run(round(bull_g, 1), discount_rate),
+    }
+    discount_table = {
+        f"r={r:g}%": run(base_growth, float(r))
+        for r in (8.0, 10.0, 12.0)
+    }
+    fcf_table = {
+        f"fcf×{m:g}": run(base_growth, discount_rate, fcf_mult=m)
+        for m in (0.8, 1.0, 1.2)
+    }
+    return {
+        "growth": growth_table,
+        "discount_rate": discount_table,
+        "fcf_conversion": fcf_table,
+        "base_assumptions": {
+            "fcf": fcf,
+            "base_growth": base_growth,
+            "discount_rate": discount_rate,
+            "terminal_growth": terminal_growth,
+            "years": years,
+            "net_debt": net_debt,
+            "shares_outstanding": shares_outstanding,
+            "price": price,
+        },
+    }
+
+
 # --- Financial health -----------------------------------------------------
 
 def altman_z(

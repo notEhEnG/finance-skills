@@ -5,27 +5,39 @@ Fetches fundamentals (data.py), derives the inputs, runs the pure engine
 in the skill (valuation, growth, risk, rule40, ai-cloud, ...) is a view over
 this same engine, so there is one source of truth for the numbers.
 
+`build_report` always returns a structured dict. Use `format_report` for text.
+Views never recompute for formatting.
+
 Usage:
     python scripts/analyze.py <TICKER> [--fixture] [--json]
-
-`--fixture` forces the offline sample record (handy where the network/yfinance
-is unavailable, e.g. the Claude.ai sandbox).
 """
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-try:  # installed as the `finance_skills` package…
+if __package__:
     from finance_skills import metrics
-    from finance_skills.data import Fundamentals, get_fundamentals_or_fixture, load_fixture
-except ImportError:  # …or run directly via `python3 scripts/analyze.py` (skill path)
+    from finance_skills.cli import run_single_ticker
+    from finance_skills.data import Fundamentals
+    from finance_skills.format import DISCLAIMER as DISCLAIMER
+    from finance_skills.format import fmt_money, footer, pct, source_line
+else:
     import metrics
-    from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
+    from cli import run_single_ticker
+    from data import Fundamentals
+    from format import DISCLAIMER as DISCLAIMER
+    from format import fmt_money, footer, pct, source_line
+
+# Re-export presentation helpers for older call sites; prefer finance_skills.format.
+_fmt_money = fmt_money
+_pct = pct
+_source_line = source_line
+_footer = footer
 
 # Map yfinance sector/industry text to a benchmark key in metrics.SECTOR_BENCHMARKS.
 _SECTOR_HINTS = [
@@ -60,14 +72,10 @@ def _stage_key(f: Fundamentals) -> str | None:
     return "mature"
 
 
-def build_report(f: Fundamentals, as_json: bool = False):
+def build_report(f: Fundamentals) -> dict:
+    """Always return a structured engine report (never a rendered string)."""
     if not f.available:
-        msg = (
-            f"Live data for {f.ticker} is unavailable ({f.error}).\n"
-            "Live fetching needs yfinance + network, which run on Claude Code but not the "
-            "Claude.ai sandbox. Try `--fixture` if a sample exists, or run on Claude Code."
-        )
-        return {"ticker": f.ticker, "available": False, "error": f.error} if as_json else msg
+        return {"ticker": f.ticker, "available": False, "error": f.error}
 
     revenue_growth = metrics.yoy_growth(f.revenue, f.revenue_prior)
     gross_margin = metrics.safe_margin(f.gross_profit, f.revenue)
@@ -78,6 +86,7 @@ def build_report(f: Fundamentals, as_json: bool = False):
 
     result: dict = {
         "ticker": f.ticker,
+        "available": True,
         "name": f.name,
         "source": f.source,
         "as_of": f.as_of,
@@ -100,10 +109,7 @@ def build_report(f: Fundamentals, as_json: bool = False):
         },
     }
 
-    # Rule of 40 (segment-aware). The engine's whole value is the EBITDA-vs-FCF
-    # capital-intensity gap, so it needs growth AND both margins — imputing the
-    # missing one from the other would zero out that gap and make the two scores
-    # look independently observed. If a margin is missing, skip and say why.
+    # Rule of 40 (segment-aware). Needs growth AND both margins — never impute.
     if revenue_growth is not None and ebitda_margin is not None and fcf_margin is not None:
         r40 = metrics.rule40_report(
             revenue_growth=revenue_growth,
@@ -116,93 +122,99 @@ def build_report(f: Fundamentals, as_json: bool = False):
             sector_key=_sector_key(f),
         )
         result["rule40"] = r40.to_dict()
-    elif revenue_growth is not None:
-        if ebitda_margin is None and fcf_margin is None:
-            missing = "EBITDA and FCF margins are"
-        else:
-            missing = ("FCF margin is" if fcf_margin is None else "EBITDA margin is")
+    else:
+        parts: list[str] = []
+        if revenue_growth is None:
+            parts.append("revenue growth (need current + prior revenue)")
+        if ebitda_margin is None:
+            parts.append("EBITDA margin (need EBITDA + revenue)")
+        if fcf_margin is None:
+            parts.append("FCF margin (need free cash flow + revenue)")
         result["rule40_note"] = (
-            f"Rule of 40 skipped: {missing} unavailable, so the EBITDA-vs-FCF "
-            "capital-intensity gap can't be computed without fabricating a margin."
+            "Rule of 40 skipped because "
+            + ("; ".join(parts) if parts else "required inputs missing")
+            + " — dual-margin capital-intensity gap cannot be fabricated."
         )
 
-    # DCF only makes sense on positive FCF; say so otherwise.
-    if f.free_cash_flow is not None and f.free_cash_flow > 0 and f.shares_outstanding:
+    # DCF: fail-closed with precise missing-input reasons + scenarios when runnable.
+    dcf_blockers: list[str] = []
+    if f.free_cash_flow is None:
+        dcf_blockers.append("free cash flow is missing")
+    elif f.free_cash_flow <= 0:
+        dcf_blockers.append(
+            f"free cash flow is not positive ({f.free_cash_flow:,.0f}; typical for capex-heavy growth)"
+        )
+    if not f.shares_outstanding:
+        dcf_blockers.append("shares outstanding is missing")
+    if f.net_debt is None:
+        sides = []
+        if f.total_debt is None:
+            sides.append("total debt")
+        if f.total_cash is None:
+            sides.append("total cash")
+        dcf_blockers.append(
+            "net debt unknown (" + " and ".join(sides or ["debt/cash"]) + " missing)"
+        )
+
+    if not dcf_blockers:
         try:
-            # Growth is a heuristic: trailing revenue growth, capped at 25% so the
-            # 2-stage model can't compound a runaway rate. Explicit None check so a
-            # genuine 0% is not silently read as "missing" and bumped to 8%.
             base = revenue_growth if revenue_growth is not None else 8.0
             g = min(base, 25.0)
             result["dcf"] = metrics.dcf_intrinsic_value(
-                fcf=f.free_cash_flow, growth_rate=g,
-                shares_outstanding=f.shares_outstanding, net_debt=f.net_debt or 0.0,
+                fcf=f.free_cash_flow,
+                growth_rate=g,
+                shares_outstanding=f.shares_outstanding,
+                net_debt=f.net_debt,
             )
-            growth_src = "default 8% (no trailing growth available)" if revenue_growth is None \
+            growth_src = (
+                "default 8% (no trailing growth available)"
+                if revenue_growth is None
                 else f"trailing revenue growth {revenue_growth:.1f}%"
+            )
             result["dcf_basis"] = (
                 f"Heuristic estimate — growth from {growth_src}, modelled at {g:.1f}% "
                 "(capped at 25%); discount 10%, terminal 3%. Highly sensitive to these "
                 "assumptions; treat as a rough anchor, not a target price."
             )
+            result["dcf_scenarios"] = metrics.dcf_scenarios(
+                fcf=f.free_cash_flow,
+                base_growth=g,
+                shares_outstanding=f.shares_outstanding,
+                net_debt=f.net_debt,
+                price=f.price,
+            )
         except ValueError as exc:
             result["dcf_note"] = str(exc)
     else:
-        result["dcf_note"] = "DCF skipped: free cash flow is not positive (typical for capex-heavy growth names)."
+        result["dcf_note"] = "DCF skipped because " + "; ".join(dcf_blockers) + "."
 
-    # Lightweight leverage read.
     if f.ebitda and f.ebitda > 0 and f.net_debt is not None:
         result["leverage"] = {"net_debt_to_ebitda": round(f.net_debt / f.ebitda, 2)}
 
-    return result if as_json else _format(result)
+    return result
 
 
-def _fmt_money(v) -> str:
-    if v is None:
-        return "n/a"
-    a = abs(v)
-    for unit, scale in (("T", 1e12), ("B", 1e9), ("M", 1e6)):
-        if a >= scale:
-            return f"${v/scale:.2f}{unit}"
-    return f"${v:,.0f}"
+def format_report(r: dict) -> str:
+    """Render a structured engine report as the flagship text dump."""
+    if not r.get("available", True):
+        return (
+            f"Live data for {r.get('ticker', '?')} is unavailable ({r.get('error')}).\n"
+            "Live fetching needs yfinance + network, which run on Claude Code but not the "
+            "Claude.ai sandbox. Try `--fixture` if a sample exists, or run on Claude Code."
+        )
 
-
-def _pct(v) -> str:
-    return "n/a" if v is None else f"{v:.1f}%"
-
-
-DISCLAIMER = (
-    "Read-only market analysis for research/education. Not investment advice; "
-    "no trades are placed. Verify figures against primary filings before acting."
-)
-
-
-def _source_line(r: dict) -> str:
-    """The 'Source: <src> · as of <date> [SAMPLE DATA]' subheader shared by every
-    report view, so the fixture-warning wording can't drift between verbs."""
-    return (f"Source: {r['source']} · as of {r['as_of']}"
-            + ("  [SAMPLE DATA — not live]" if r["source"] == "fixture" else ""))
-
-
-def _footer() -> list[str]:
-    """The rule + not-advice disclaimer that closes every report view. One copy so
-    a compliance edit lands everywhere at once."""
-    return ["─" * 60, DISCLAIMER]
-
-
-def _format(r: dict) -> str:
     d = r["derived"]
     lines = [
         f"═══ {r['name'] or r['ticker']} ({r['ticker']}) ═══",
-        _source_line(r),
+        source_line(r),
         f"Sector: {r.get('sector') or 'n/a'} / {r.get('industry') or 'n/a'}",
-        f"Price: {_fmt_money(r.get('price'))}   Market cap: {_fmt_money(r.get('market_cap'))}",
+        f"Price: {fmt_money(r.get('price'))}   Market cap: {fmt_money(r.get('market_cap'))}",
         "",
         "Fundamentals (derived):",
-        f"  Revenue growth (YoY): {_pct(d['revenue_growth_pct'])}",
-        f"  EBITDA margin: {_pct(d['ebitda_margin_pct'])}   FCF margin: {_pct(d['fcf_margin_pct'])}",
-        f"  Capex intensity: {_pct(d['capex_intensity_pct'])}   Share dilution: {_pct(d['share_dilution_pct'])}",
-        f"  Net debt: {_fmt_money(d['net_debt'])}",
+        f"  Revenue growth (YoY): {pct(d['revenue_growth_pct'])}",
+        f"  EBITDA margin: {pct(d['ebitda_margin_pct'])}   FCF margin: {pct(d['fcf_margin_pct'])}",
+        f"  Capex intensity: {pct(d['capex_intensity_pct'])}   Share dilution: {pct(d['share_dilution_pct'])}",
+        f"  Net debt: {fmt_money(d['net_debt'])}",
     ]
 
     if "rule40" in r:
@@ -227,37 +239,43 @@ def _format(r: dict) -> str:
         dcf = r["dcf"]
         lines += [
             "",
-            f"DCF (simple 2-stage): intrinsic ≈ {_fmt_money(dcf['per_share'])}/share "
+            f"DCF (simple 2-stage): intrinsic ≈ {fmt_money(dcf['per_share'])}/share "
             f"(g={dcf['assumptions']['growth_rate']}%, r={dcf['assumptions']['discount_rate']}%)",
         ]
         if "dcf_basis" in r:
             lines.append(f"  {r['dcf_basis']}")
+        sc = r.get("dcf_scenarios") or {}
+        if sc.get("growth"):
+            lines.append("  Scenarios (per share):")
+            for name, row in sc["growth"].items():
+                vs = row.get("vs_price_pct")
+                vs_s = f", {vs:+.1f}% vs price" if vs is not None else ""
+                lines.append(
+                    f"    {name}: {fmt_money(row['per_share'])} "
+                    f"(g={row['growth_rate']}%, r={row['discount_rate']}%){vs_s}"
+                )
     elif "dcf_note" in r:
         lines += ["", f"DCF: {r['dcf_note']}"]
 
     if "leverage" in r:
         lines += [f"Leverage: net debt / EBITDA = {r['leverage']['net_debt_to_ebitda']}x"]
 
-    lines += ["", *_footer()]
+    lines += ["", *footer()]
     return "\n".join(lines)
 
 
+def build_report_view(f: Fundamentals, as_json: bool = False):
+    """View adapter for the shared CLI / export registry."""
+    r = build_report(f)
+    return r if as_json else format_report(r)
+
+
 def main(argv: list[str]) -> int:
-    args = [a for a in argv if not a.startswith("--")]
-    flags = {a for a in argv if a.startswith("--")}
-    if not args:
-        print("usage: python scripts/analyze.py <TICKER> [--fixture] [--json]", file=sys.stderr)
-        return 2
-
-    ticker = args[0].upper()
-    if "--fixture" in flags:
-        f = load_fixture(ticker) or Fundamentals(ticker=ticker, available=False, error="no fixture for this ticker")
-    else:
-        f = get_fundamentals_or_fixture(ticker)
-
-    report = build_report(f, as_json="--json" in flags)
-    print(json.dumps(report, indent=2) if "--json" in flags else report)
-    return 0 if f.available else 1  # non-zero on unavailable data, in text and json alike
+    return run_single_ticker(
+        argv,
+        usage="usage: python scripts/analyze.py <TICKER> [--fixture] [--json]",
+        build=build_report_view,
+    )
 
 
 if __name__ == "__main__":

@@ -18,16 +18,19 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-try:  # installed as the `finance_skills` package…
+if __package__:
     from finance_skills import analyze
-    from finance_skills.analyze import _pct
-    from finance_skills.data import Fundamentals, get_fundamentals_or_fixture, load_fixture
-except ImportError:  # …or run directly via `python3 scripts/framework.py` (skill path)
+    from finance_skills.cli import parse_argv
+    from finance_skills.data import Fundamentals, load_for_cli
+    from finance_skills.format import footer, pct, source_line
+else:
     import analyze
-    from analyze import _pct
-    from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
+    from cli import parse_argv
+    from data import Fundamentals, load_for_cli
+    from format import footer, pct, source_line
 
 # Each metric is (label, source-key, reader). `source` is either a callable that
 # derives a line from the engine report, or a KPI string (definition) that the
@@ -43,7 +46,7 @@ def _rule40(r):
             f"(EBITDA {x['score_ebitda']:.0f} / FCF {x['score_fcf']:.0f}, gap {x['capital_intensity_gap']:.0f})")
 
 
-def _derived(key, fmt=_pct):
+def _derived(key, fmt=pct):
     return lambda r: fmt(r["derived"].get(key))
 
 
@@ -102,10 +105,12 @@ FRAMEWORKS: dict[str, dict] = {
     },
 }
 
-# Route sector/company hints to a framework so the agent can pick a sensible default.
-ALIASES = {"software": "saas", "cloud": "neocloud", "ai-cloud": "neocloud",
-           "gpu": "neocloud", "semis": "semiconductor", "semi": "semiconductor",
-           "chips": "semiconductor"}
+# Sector-token aliases — keep aligned with router.FRAMEWORK_TOKENS / ALIASES.
+ALIASES = {
+    "software": "saas", "cloud": "neocloud", "ai-cloud": "neocloud",
+    "gpu": "neocloud", "semis": "semiconductor", "semi": "semiconductor",
+    "chips": "semiconductor",
+}
 
 
 def resolve_framework(name: str) -> str | None:
@@ -117,9 +122,9 @@ def resolve_framework(name: str) -> str | None:
 
 def build_framework(name: str, f: Fundamentals, as_json: bool = False):
     fw = FRAMEWORKS[name]
-    report = analyze.build_report(f, as_json=True)
-    if isinstance(report, dict) and not report.get("available", True):
-        return report if as_json else analyze.build_report(f, as_json=False)
+    report = analyze.build_report(f)
+    if not report.get("available", True):
+        return report if as_json else analyze.format_report(report)
 
     rows = []
     for label, src in fw["metrics"]:
@@ -136,7 +141,7 @@ def build_framework(name: str, f: Fundamentals, as_json: bool = False):
 def _render(r: dict, name: str, title: str, rows: list[dict]) -> str:
     out = [
         f"═══ {r['name'] or r['ticker']} ({r['ticker']}) — {title} framework ═══",
-        analyze._source_line(r),
+        source_line(r),
         "",
     ]
     width = max(len(row["metric"]) for row in rows)
@@ -154,13 +159,12 @@ def _render(r: dict, name: str, title: str, rows: list[dict]) -> str:
                     "(defined, not faked):"]
         for metric, defn in kpis:
             out.append(f"    • {metric} — {defn}")
-    out += analyze._footer()
+    out += footer()
     return "\n".join(out)
 
 
 def main(argv: list[str]) -> int:
-    args = [a for a in argv if not a.startswith("--")]
-    flags = {a for a in argv if a.startswith("--")}
+    args, flags = parse_argv(argv)
     if args and args[0].lower() == "list":
         for key, fw in FRAMEWORKS.items():
             print(f"{key:14s} {fw['title']}")
@@ -174,14 +178,10 @@ def main(argv: list[str]) -> int:
     if name is None:
         print(f"unknown framework: {args[0]}. Try: {', '.join(FRAMEWORKS)}", file=sys.stderr)
         return 2
-    ticker = args[1].upper()
-    if "--fixture" in flags:
-        f = load_fixture(ticker) or Fundamentals(ticker=ticker, available=False, error="no fixture for this ticker")
-    else:
-        f = get_fundamentals_or_fixture(ticker)
+    f = load_for_cli(args[1], use_fixture="--fixture" in flags)
     report = build_framework(name, f, as_json="--json" in flags)
     print(json.dumps(report, indent=2) if "--json" in flags else report)
-    return 0 if f.available else 1  # surface unavailable/missing-fixture to callers
+    return 0 if f.available else 1
 
 
 if __name__ == "__main__":

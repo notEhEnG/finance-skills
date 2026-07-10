@@ -60,7 +60,7 @@ class TestBrief(unittest.TestCase):
         # Preferred Rule 40 must match analyze.build_report — one engine.
         import analyze
         f = data.load_fixture("NBIS")
-        report = analyze.build_report(f, as_json=True)
+        report = analyze.build_report(f)
         b = brief.build_brief(f, as_json=True)
         self.assertEqual(
             b["rule40"]["preferred_score"],

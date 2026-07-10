@@ -49,10 +49,6 @@ def normalize_ticker(ticker: str) -> str:
     return t
 
 
-# Back-compat private alias (tests / older call sites).
-_normalize_ticker = normalize_ticker
-
-
 @dataclass
 class Fundamentals:
     ticker: str
@@ -100,7 +96,7 @@ def _now_iso() -> str:
 def _cache_path(ticker: str) -> Path:
     # Defense-in-depth: even though callers normalize, refuse any path that would
     # resolve outside CACHE_DIR (a second line against traversal on the write surface).
-    path = CACHE_DIR / f"{_normalize_ticker(ticker)}.json"
+    path = CACHE_DIR / f"{normalize_ticker(ticker)}.json"
     if path.resolve().parent != CACHE_DIR.resolve():
         raise ValueError(f"cache path escapes CACHE_DIR for ticker {ticker!r}")
     return path
@@ -192,7 +188,7 @@ def _col(df, keys, column=0):
 def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
     """Fetch and normalise fundamentals for `ticker`. Never raises."""
     try:
-        ticker = _normalize_ticker(ticker)
+        ticker = normalize_ticker(ticker)
     except ValueError as exc:
         # Reject before any cache read/write — a malformed ticker must never reach
         # the filesystem path builder (path-traversal guard on the write surface).
@@ -309,6 +305,11 @@ def load_fixture(ticker: str) -> Fundamentals | None:
     except ValueError:
         return None
     return _FIXTURES.get(t)
+
+
+def list_fixtures() -> list[str]:
+    """Tickers that have offline sample records (public; do not import `_FIXTURES`)."""
+    return sorted(_FIXTURES)
 
 
 def get_fundamentals_or_fixture(ticker: str, use_cache: bool = True) -> Fundamentals:

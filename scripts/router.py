@@ -11,36 +11,38 @@ questions always land on **`brief`** (method=`default`).
 
 from __future__ import annotations
 
-import importlib
 import re
 import sys
 from dataclasses import dataclass
 from difflib import get_close_matches
+from pathlib import Path
 
 
 @dataclass(frozen=True)
 class Verb:
     """One product verb.
 
-    tier:    "core" (engine module), "lens" (qualitative), "meta" (help/route)
-    module:  scripts module name with main(argv), or None if not runnable
-    group:   help-group label (None = hide from grouped help)
+    tier:     "core" (engine module), "lens" (qualitative), "meta" (help/route)
+    module:   scripts module name with main(argv), or None if not runnable
+    group:    help-group label (None = hide from grouped help)
+    builder:  single-ticker build(Fundamentals, as_json) name on `module`, if any
     """
     name: str
     tier: str
     module: str | None = None
     group: str | None = None
+    builder: str | None = None
 
 
-# Single source of truth — derive sets/help from this.
+# Single source of truth — derive sets/help/export/watchlist from this.
 VERBS: dict[str, Verb] = {
-    "brief":      Verb("brief", "core", "brief", "Default stack"),
-    "company":    Verb("company", "core", "company", "Whole company"),
-    "analyze":    Verb("analyze", "core", "analyze", "Whole company"),
+    "brief":      Verb("brief", "core", "brief", "Default stack", "build_brief"),
+    "company":    Verb("company", "core", "company", "Whole company", "build_company"),
+    "analyze":    Verb("analyze", "core", "analyze", "Whole company", "build_report_view"),
     "framework":  Verb("framework", "core", "framework", "Whole company"),
-    "valuation":  Verb("valuation", "core", "valuation", "Is it cheap?"),
-    "redflags":   Verb("redflags", "core", "redflags", "Is it safe?"),
-    "health":     Verb("health", "core", "health", "Is it safe?"),
+    "valuation":  Verb("valuation", "core", "valuation", "Is it cheap?", "build_valuation"),
+    "redflags":   Verb("redflags", "core", "redflags", "Is it safe?", "build_redflags"),
+    "health":     Verb("health", "core", "health", "Is it safe?", "build_health"),
     "compare":    Verb("compare", "core", "compare", "How does it compare?"),
     "screen":     Verb("screen", "core", "screen", "Power tools"),
     "watchlist":  Verb("watchlist", "core", "watchlist", "Power tools"),
@@ -120,6 +122,10 @@ CORE_VERBS: set[str] = {n for n, v in VERBS.items() if v.tier == "core"}
 LENS_VERBS: set[str] = {n for n, v in VERBS.items() if v.tier == "lens"}
 TOP_VERBS: list[str] = ["brief", "company", "analyze", "valuation", "framework", "compare", "learn"]
 RUNNABLE: dict[str, str] = {n: v.module for n, v in VERBS.items() if v.module}
+# Single-ticker builders — export + watchlist read this; no second registry.
+BUILDERS: dict[str, str] = {n: v.builder for n, v in VERBS.items() if v.builder}
+EXPORTABLE: set[str] = set(BUILDERS)
+WATCHLIST_VERBS: set[str] = set(BUILDERS)
 
 
 def _help_groups() -> dict[str, list[str]]:
@@ -217,11 +223,6 @@ class Route:
     @property
     def resolved(self) -> bool:
         return True
-
-
-def effective_verb(r: Route) -> str:
-    """Always the verb to run (Route.verb is never empty)."""
-    return r.verb
 
 
 def route(text: str, *, apply_default: bool = True) -> Route:
@@ -327,10 +328,43 @@ def format_help() -> str:
 
 
 def _load_module(name: str):
+    """Load a sibling module from the same directory as this file.
+
+    Prefer co-located sources over a possibly-stale site-packages install: when
+    tests/skill path put `scripts/` on sys.path, `import finance_skills.X` can
+    still resolve to an older installed copy. Loading by file path keeps
+    dispatch and builders on the same tree as this router.
+    """
+    import importlib.util
+
+    path = Path(__file__).resolve().parent / f"{name}.py"
+    if path.is_file():
+        for mod in sys.modules.values():
+            mod_file = getattr(mod, "__file__", None)
+            if mod_file and Path(mod_file).resolve() == path:
+                return mod
+        # Unique name so we don't collide with a different on-disk copy already loaded.
+        unique = f"_finance_skills_colocal.{name}"
+        spec = importlib.util.spec_from_file_location(unique, path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot load {path}")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[unique] = mod
+        spec.loader.exec_module(mod)
+        return mod
     try:
         return importlib.import_module(f"finance_skills.{name}")
     except ImportError:
         return importlib.import_module(name)
+
+
+def load_builder(command: str):
+    """Return build(Fundamentals, as_json) for a registered single-ticker verb."""
+    builder = BUILDERS.get(command)
+    if not builder:
+        raise KeyError(f"no single-ticker builder for {command!r}")
+    mod = _load_module(RUNNABLE[command])
+    return getattr(mod, builder)
 
 
 def dispatch(command: str, argv: list[str], framework: str | None = None) -> int:

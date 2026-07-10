@@ -2,10 +2,10 @@
 
     python scripts/export.py <TICKER> [--verb=valuation] [--format=md] [--out=PATH] [--fixture]
 
-Reuses the same build functions as the interactive verbs, so an exported report
-is byte-for-byte the numbers the skill would have shown. CSV flattens the
-Metric/Value/Read table (the table verbs only); Markdown wraps the text report;
-JSON is the engine's structured `--json` payload. Writes to --out or stdout.
+Reuses the same build functions as the interactive verbs (via the shared verb
+registry), so an exported report is the numbers the skill would have shown.
+CSV flattens the Metric/Value/Read table (the table verbs only); Markdown wraps
+the text report; JSON is the engine's structured payload. Writes to --out or stdout.
 
 READ-ONLY: writes a local report file; never touches an account or the network
 beyond the same fetch the other verbs do.
@@ -19,27 +19,17 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-try:  # installed as the `finance_skills` package…
-    from finance_skills import analyze, brief, health, redflags, valuation
-    from finance_skills.data import Fundamentals, get_fundamentals_or_fixture, load_fixture
-except ImportError:  # …or run directly via `python3 scripts/export.py` (skill path)
-    import analyze
-    import brief
-    import health
-    import redflags
-    import valuation
-    from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
-
-# verb -> builder(Fundamentals, as_json=bool).
-BUILDERS = {
-    "brief":     brief.build_brief,
-    "analyze":   analyze.build_report,
-    "valuation": valuation.build_valuation,
-    "health":    health.build_health,
-    "redflags":  redflags.build_redflags,
-}
+if __package__:
+    from finance_skills.cli import flag_value, parse_argv
+    from finance_skills.data import load_for_cli
+    from finance_skills.router import EXPORTABLE, load_builder
+else:
+    from cli import flag_value, parse_argv
+    from data import load_for_cli
+    from router import EXPORTABLE, load_builder
 
 
 def _rows_from_json(payload: dict) -> list[tuple[str, str, str]]:
@@ -54,16 +44,16 @@ def _rows_from_json(payload: dict) -> list[tuple[str, str, str]]:
     return out
 
 
-def export(f: Fundamentals, verb: str, fmt: str) -> str:
-    build = BUILDERS[verb]
+def export(f, verb: str, fmt: str) -> str:
+    build = load_builder(verb)
     if fmt == "json":
-        return json.dumps(build(f, as_json=True), indent=2)
+        return json.dumps(build(f, True), indent=2)
     if fmt == "md":
-        text = build(f, as_json=False)
+        text = build(f, False)
         title = f"# {f.name or f.ticker} ({f.ticker}) — {verb}"
         return f"{title}\n\n```\n{text}\n```\n"
     if fmt == "csv":
-        payload = build(f, as_json=True)
+        payload = build(f, True)
         rows = _rows_from_json(payload)
         if not rows:
             raise ValueError(f"{verb} has no tabular rows to export as CSV; try --format=md or json")
@@ -76,35 +66,24 @@ def export(f: Fundamentals, verb: str, fmt: str) -> str:
     raise ValueError(f"unknown format {fmt!r} — use md, json, or csv")
 
 
-def _flag(flags: set[str], name: str, default: str) -> str:
-    for fl in flags:
-        if fl.startswith(f"--{name}="):
-            return fl.split("=", 1)[1]
-    return default
-
-
 def main(argv: list[str]) -> int:
-    args = [a for a in argv if not a.startswith("--")]
-    flags = {a for a in argv if a.startswith("--")}
+    args, flags = parse_argv(argv)
     if not args:
         print("usage: python scripts/export.py <TICKER> [--verb=valuation] [--format=md] [--out=PATH] [--fixture]\n"
-              f"       verbs: {', '.join(BUILDERS)}   formats: md, json, csv", file=sys.stderr)
+              f"       verbs: {', '.join(sorted(EXPORTABLE))}   formats: md, json, csv", file=sys.stderr)
         return 2
 
-    ticker = args[0].upper()
-    verb = _flag(flags, "verb", "valuation")
-    fmt = _flag(flags, "format", "md")
-    out = _flag(flags, "out", "")
-    if verb not in BUILDERS:
-        print(f"unknown verb {verb!r}. Exportable: {', '.join(BUILDERS)}", file=sys.stderr)
+    ticker = args[0]
+    verb = flag_value(flags, "verb", "valuation")
+    fmt = flag_value(flags, "format", "md")
+    out = flag_value(flags, "out", "")
+    if verb not in EXPORTABLE:
+        print(f"unknown verb {verb!r}. Exportable: {', '.join(sorted(EXPORTABLE))}", file=sys.stderr)
         return 2
 
-    if "--fixture" in flags:
-        f = load_fixture(ticker) or Fundamentals(ticker=ticker, available=False, error="no fixture for this ticker")
-    else:
-        f = get_fundamentals_or_fixture(ticker)
+    f = load_for_cli(ticker, use_fixture="--fixture" in flags)
     if not f.available:
-        print(f"No data for {ticker}: {f.error}", file=sys.stderr)
+        print(f"No data for {f.ticker}: {f.error}", file=sys.stderr)
         return 1
 
     try:
@@ -115,7 +94,7 @@ def main(argv: list[str]) -> int:
 
     if out:
         Path(out).write_text(rendered, encoding="utf-8")
-        print(f"Wrote {verb} report for {ticker} → {out} ({fmt}, {len(rendered)} bytes)")
+        print(f"Wrote {verb} report for {f.ticker} → {out} ({fmt}, {len(rendered)} bytes)")
     else:
         print(rendered)
     return 0

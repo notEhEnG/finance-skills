@@ -25,14 +25,20 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-try:  # installed as the `finance_skills` package…
-    from finance_skills import analyze
-    from finance_skills.data import _FIXTURES, get_fundamentals_or_fixture, load_fixture
-except ImportError:  # …or run directly via `python3 scripts/screen.py` (skill path)
+if __package__:
+    from finance_skills import analyze, rank
+    from finance_skills.cli import parse_argv
+    from finance_skills.data import list_fixtures, load_for_cli
+    from finance_skills.format import DISCLAIMER
+else:
     import analyze
-    from data import _FIXTURES, get_fundamentals_or_fixture, load_fixture
+    import rank
+    from cli import parse_argv
+    from data import list_fixtures, load_for_cli
+    from format import DISCLAIMER
 
 # Field name -> how to read it out of the engine report. Add here to expose more.
 FIELDS: dict[str, Callable[[dict], Any]] = {
@@ -66,12 +72,7 @@ class RuleError(ValueError):
 
 
 def _parse_clause(clause: str) -> tuple[str, str, float]:
-    """Validate one clause and return (field, op, number), or raise RuleError.
-
-    Pure validation — no report needed. Every clause in a rule is parsed up front
-    (see `evaluate`) so a valid-looking prefix can never mask a malformed or
-    hostile clause behind short-circuit evaluation.
-    """
+    """Validate one clause and return (field, op, number), or raise RuleError."""
     m = _CLAUSE_RE.match(clause)
     if not m:
         raise RuleError(f"can't parse clause: {clause!r} — expected `field op number`")
@@ -113,15 +114,26 @@ def evaluate(rule: str, report: dict) -> bool:
 
 def screen(rule: str, tickers: list[str], use_fixture: bool = False) -> dict:
     results: list[dict[str, Any]] = []
+    reports: list[dict] = []
     for ticker in tickers:
-        f = load_fixture(ticker) if use_fixture else get_fundamentals_or_fixture(ticker)
-        if f is None or not getattr(f, "available", False):
+        f = load_for_cli(ticker, use_fixture=use_fixture)
+        if not f.available:
             results.append({"ticker": ticker.upper(), "passes": None, "note": "no data"})
             continue
-        report = analyze.build_report(f, as_json=True)
+        report = analyze.build_report(f)
+        reports.append(report)
         results.append({"ticker": report["ticker"], "passes": evaluate(rule, report),
                         "values": {k: FIELDS[k](report) for k in _fields_in(rule)}})
-    return {"rule": rule, "matches": [r for r in results if r.get("passes")], "results": results}
+    # Rank the full universe and the match set (decision support).
+    matches = [r for r in results if r.get("passes")]
+    match_reports = [rep for rep in reports if any(m["ticker"] == rep["ticker"] for m in matches)]
+    return {
+        "rule": rule,
+        "matches": matches,
+        "results": results,
+        "ranking": rank.rank_reports(reports),
+        "ranking_matches": rank.rank_reports(match_reports) if match_reports else rank.rank_reports([]),
+    }
 
 
 def _fields_in(rule: str) -> list[str]:
@@ -140,7 +152,17 @@ def _render(res: dict) -> str:
         vals = "  ".join(f"{k}={_fmt(r['values'].get(k))}" for k in fields)
         out.append(f"  {mark}  {r['ticker']:6s} {vals}")
     out += ["", f"{len(passed)}/{len(res['results'])} pass: {', '.join(r['ticker'] for r in passed) or '—'}"]
-    out += [analyze.DISCLAIMER]
+    if res.get("ranking"):
+        out += ["", *rank.render_ranking(res["ranking"])]
+    if res.get("ranking_matches") and res["ranking_matches"].get("n"):
+        out += ["", "Among matches only:"]
+        # indent ranking lines slightly
+        for line in rank.render_ranking(res["ranking_matches"]):
+            if line.startswith("Ranking"):
+                out.append("  " + line.replace("Ranking summary", "Match ranking"))
+            else:
+                out.append("  " + line if not line.startswith("  ") else "  " + line)
+    out += ["", DISCLAIMER]
     return "\n".join(out)
 
 
@@ -149,14 +171,13 @@ def _fmt(v) -> str:
 
 
 def main(argv: list[str]) -> int:
-    args = [a for a in argv if not a.startswith("--")]
-    flags = {a for a in argv if a.startswith("--")}
+    args, flags = parse_argv(argv)
     if not args:
         print('usage: python scripts/screen.py "<rule>" [TICKER ...] [--fixture] [--json]\n'
               f"       fields: {', '.join(sorted(FIELDS))}", file=sys.stderr)
         return 2
     rule = args[0]
-    tickers = [a.upper() for a in args[1:]] or sorted(_FIXTURES)
+    tickers = [a.upper() for a in args[1:]] or list_fixtures()
     use_fixture = "--fixture" in flags or not args[1:]  # fixtures-only universe implies fixture mode
     try:
         res = screen(rule, tickers, use_fixture=use_fixture)
@@ -164,7 +185,7 @@ def main(argv: list[str]) -> int:
         print(f"bad rule: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(res, indent=2) if "--json" in flags else _render(res))
-    return 0 if res["matches"] else 1  # non-zero when nothing matched, for scripting
+    return 0 if res["matches"] else 1
 
 
 if __name__ == "__main__":

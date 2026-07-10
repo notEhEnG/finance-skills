@@ -63,6 +63,13 @@ class TestResolve(unittest.TestCase):
         for name in router.CORE_VERBS:
             self.assertIn(name, router.RUNNABLE, f"Core verb without module: {name}")
 
+    def test_builders_are_loadable(self):
+        for name in router.BUILDERS:
+            fn = router.load_builder(name)
+            self.assertTrue(callable(fn), name)
+        self.assertEqual(router.EXPORTABLE, set(router.BUILDERS))
+        self.assertEqual(router.WATCHLIST_VERBS, set(router.BUILDERS))
+
 
 class TestKeywordRouting(unittest.TestCase):
     def test_plain_questions_map_to_runnable_verbs(self):
@@ -86,7 +93,7 @@ class TestKeywordRouting(unittest.TestCase):
         r = router.route("please water the plants")
         self.assertEqual(r.verb, "brief")
         self.assertEqual(r.method, "default")
-        self.assertEqual(router.effective_verb(r), "brief")
+        self.assertEqual(r.verb, "brief")
 
     def test_leading_question_word_does_not_hijack(self):
         # "what color..." has no finance keyword → default brief, not a fuzzy verb.

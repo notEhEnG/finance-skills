@@ -68,19 +68,26 @@ never diverge across questions.
 ### Commands
 
 ```bash
-python3 scripts/brief.py       <TICKER> [--fixture|--json]   # DEFAULT stack
+python3 scripts/brief.py       <TICKER> [--fixture|--json] [--style=value|growth|quality|risk] [--explain]
 python3 scripts/company.py     <TICKER> [--fixture|--json]   # 9-stage walkthrough
-python3 scripts/analyze.py     <TICKER> [--fixture|--json]   # dense flagship dump
-python3 scripts/valuation.py   <TICKER> [--fixture|--json]
+python3 scripts/analyze.py     <TICKER> [--fixture|--json]   # dense flagship dump (+ DCF scenarios when allowed)
+python3 scripts/valuation.py   <TICKER> [--fixture|--json] [--explain]
 python3 scripts/framework.py   <saas|neocloud|semiconductor> <TICKER> [--fixture]
 python3 scripts/redflags.py    <TICKER> [--fixture|--json]
 python3 scripts/health.py      <TICKER> [--fixture|--json]
-python3 scripts/compare.py     <A> <B> [...] [--fixture]
-python3 scripts/screen.py      "<rule>" [TICKER ...]
-python3 scripts/watchlist.py   <add|list|run ...>
+python3 scripts/compare.py     <A> <B> [...] [--fixture]     # or --preset=saas|ai-infra|semiconductor|megacap
+python3 scripts/compare.py     list-presets
+python3 scripts/screen.py      "<rule>" [TICKER ...]         # includes ranking summary
+python3 scripts/watchlist.py   <add|list|run ...>            # run rank | compare | valuation…
 python3 scripts/export.py      <TICKER> [--verb=brief|valuation|...] [--format=md|json|csv]
 python3 scripts/learn.py       <concept>
 ```
+
+Optional brief flags:
+
+- `--style=value|growth|quality|risk` — same facts, persona emphasis first
+- `--explain` — plain-language “why this matters” for computed metrics
+- Brief always lists **disabled analyses** (exact missing inputs) and a **filing verification checklist**
 
 If `yfinance` is missing: `pip install yfinance`.
 

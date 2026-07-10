@@ -6,6 +6,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-11
+
+### Added
+- **Investor personas** on brief: `--style=value|growth|quality|risk` (same facts, different emphasis).
+- **`--explain`**: plain-language “why this matters” for computed metrics (`explain.py`).
+- **Precise missing-data diagnostics** + **filing verification checklist** on brief (`diagnostics.py`).
+- **DCF scenarios** when inputs allow: bear/base/bull growth, discount-rate and FCF-conversion sensitivity (`metrics.dcf_scenarios`).
+- **Peer presets** for compare: `--preset=saas|ai-infra|semiconductor|megacap` (`peers.py`); `compare list-presets`.
+- **Ranking summary** on screen, compare, and `watchlist run rank` (`rank.py`).
+- Shared presentation (`format.py`) and CLI plumbing (`cli.py`, `run_single_ticker`, `load_for_cli` everywhere).
+- Single verb **builder registry** (`Verb.builder` → export/watchlist); co-located module dispatch.
+
+### Changed
+- `build_report` always returns a structured dict; text via `format_report` (no dual return type).
+- Skill-path imports use `if __package__` so a stale site-packages install cannot shadow scripts/.
+- Company **Risks** section uses `redflags.flags_for` (one policy).
+
+### Fixed
+- **DCF fail-closed on unknown net debt** (no more `net_debt or 0.0`); skip reasons name exact missing inputs (FCF, shares, debt/cash).
+
 ## [0.4.0] - 2026-07-11
 
 ### Added

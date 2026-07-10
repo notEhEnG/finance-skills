@@ -1,103 +1,94 @@
 """brief — the default answer-shaped stack over the shared engine.
 
-The no-verb / bare-ticker path and the explicit `brief` verb both land here.
 Spine (fixed; no second math path):
 
   identity → regime + dual/preferred Rule of 40 + capital-intensity gap
            → valuation (EV/S, EV/EBITDA, DCF if allowed)
            → solvency (net debt, FCF margin, dilution)
            → top red flags (severity-sorted, max 3)
-           → gaps[] (missing fields + what unlocks them)
+           → disabled analyses (precise missing inputs)
+           → gaps[] + filing checklist
+           → optional: --style=value|growth|quality|risk emphasis
+           → optional: --explain (why metrics matter)
            → disclaimer
 
-    python scripts/brief.py <TICKER> [--fixture|--json]
-    finance-skills brief NBIS --fixture
-    finance-skills NBIS --fixture          # same default
-
-Prefer `--json` when an agent composes an answer-first reply.
+    python scripts/brief.py <TICKER> [--fixture|--json] [--style=value] [--explain]
+    finance-skills brief NBIS --fixture --style=risk --explain
 """
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-try:  # installed as the `finance_skills` package…
-    from finance_skills import analyze, redflags
-    from finance_skills.analyze import _fmt_money, _pct
-    from finance_skills.data import Fundamentals, load_for_cli
-except ImportError:  # …or run directly via `python3 scripts/brief.py` (skill path)
+if __package__:
+    from finance_skills import analyze, diagnostics, explain, redflags
+    from finance_skills import style as style_mod
+    from finance_skills.cli import flag_value, has_flag, run_single_ticker
+    from finance_skills.data import Fundamentals
+    from finance_skills.format import DISCLAIMER, fmt_money, footer, mult, pct, source_line
+else:
     import analyze
+    import diagnostics
+    import explain
     import redflags
-    from analyze import _fmt_money, _pct
-    from data import Fundamentals, load_for_cli
-
-
-def _mult(v) -> str:
-    return "n/a" if v is None else f"{v}x"
+    import style as style_mod
+    from cli import flag_value, has_flag, run_single_ticker
+    from data import Fundamentals
+    from format import DISCLAIMER, fmt_money, footer, mult, pct, source_line
 
 
 def _gaps(r: dict) -> list[dict[str, str]]:
-    """Fail-closed guided gaps: never invent; name what disclosure unlocks."""
-    d = r.get("derived") or {}
+    """Fail-closed guided gaps from disabled diagnostics + neocloud extras."""
     gaps: list[dict[str, str]] = []
-
-    def add(field: str, why: str, unlocks: str) -> None:
-        gaps.append({"field": field, "why": why, "unlocks": unlocks})
-
-    if d.get("net_debt") is None:
-        add("net_debt", "debt or cash missing from the fetch",
-            "balance sheet total debt + cash (10-K/10-Q)")
-    if d.get("revenue_growth_pct") is None:
-        add("revenue_growth", "need current and prior revenue",
-            "income statement two periods, or disclosed YoY growth")
-    if d.get("fcf_margin_pct") is None:
-        add("fcf_margin", "free cash flow or revenue missing",
-            "cash flow statement FCF + revenue")
-    if d.get("ebitda_margin_pct") is None:
-        add("ebitda_margin", "EBITDA or revenue missing",
-            "income statement EBITDA (or operating income proxy) + revenue")
-    if "rule40" not in r:
-        add("rule40", r.get("rule40_note") or "insufficient inputs for dual-margin Rule of 40",
-            "revenue growth + EBITDA margin + FCF margin")
-    if "dcf" not in r:
-        note = r.get("dcf_note") or "DCF not computed"
-        if "not positive" in note.lower() or "negative" in note.lower():
-            add("dcf", "FCF not positive — intrinsic DCF skipped by design",
-                "sustainable positive FCF (or a disclosed FCF outlook); until then use multiples")
-        else:
-            add("dcf", note, "positive FCF, shares outstanding, and net debt")
-
+    for d in r.get("disabled") or []:
+        gaps.append({
+            "field": d["analysis"],
+            "why": d["reason"],
+            "unlocks": d["unlocks"],
+            "missing_inputs": ", ".join(d.get("missing_inputs") or []) or None,
+        })
     rule = r.get("rule40") or {}
     if rule.get("regime") in ("ai_neocloud", "hypergrowth"):
-        add("backlog_rpo", "not in summary financials (yfinance)",
-            "disclosed revenue backlog / RPO from earnings release or 10-Q")
-
+        gaps.append({
+            "field": "backlog_rpo",
+            "why": "not in summary financials (yfinance)",
+            "unlocks": "disclosed revenue backlog / RPO from earnings release or 10-Q",
+            "missing_inputs": "backlog/RPO disclosure",
+        })
     return gaps
 
 
-def build_brief(f: Fundamentals, as_json: bool = False):
+def build_brief(f: Fundamentals, as_json: bool = False, flags: set[str] | None = None):
     """Build the standard brief spine over `analyze.build_report`."""
-    report = analyze.build_report(f, as_json=True)
-    if isinstance(report, dict) and report.get("available") is False:
+    flags = flags or set()
+    report = analyze.build_report(f)
+    if not report.get("available", True):
         if as_json:
             return report
-        # Text path for unavailable — reuse the string form without a second compute.
         err = report.get("error") or "unavailable"
         return (
             f"Live data for {report.get('ticker', '?')} is unavailable ({err}).\n"
             "Try `--fixture` if a sample exists, or run where yfinance + network work.\n"
-            f"{analyze.DISCLAIMER}"
+            f"{DISCLAIMER}"
         )
+
+    style_name = style_mod.normalize_style(flag_value(flags, "style", ""))
+    want_explain = has_flag(flags, "explain")
+
+    disabled = diagnostics.disabled_analyses(f, report)
+    report_for_gaps = {**report, "disabled": disabled}
+    gaps = _gaps(report_for_gaps)
+    checklist = diagnostics.filing_checklist({"disabled": disabled, "gaps": gaps})
+    why = explain.why_lines_for_report(report) if want_explain else []
 
     d = report["derived"]
     rule = report.get("rule40")
-    flags = redflags.flags_for(report, limit=3)
-    gaps = _gaps(report)
+    flags_list = redflags.flags_for(report, limit=3)
 
     payload: dict[str, Any] = {
         "ticker": report["ticker"],
@@ -109,6 +100,7 @@ def build_brief(f: Fundamentals, as_json: bool = False):
         "price": report.get("price"),
         "market_cap": report.get("market_cap"),
         "regime": (rule or {}).get("regime"),
+        "style": style_name,
         "rule40": {
             "preferred_score": (rule or {}).get("preferred_score"),
             "benchmark": (rule or {}).get("benchmark"),
@@ -126,6 +118,7 @@ def build_brief(f: Fundamentals, as_json: bool = False):
             "enterprise_value": d.get("enterprise_value"),
             "dcf_per_share": (report.get("dcf") or {}).get("per_share"),
             "dcf_note": report.get("dcf_note"),
+            "dcf_scenarios": report.get("dcf_scenarios"),
         },
         "solvency": {
             "net_debt": d.get("net_debt"),
@@ -135,9 +128,12 @@ def build_brief(f: Fundamentals, as_json: bool = False):
             "capex_intensity_pct": d.get("capex_intensity_pct"),
             "revenue_growth_pct": d.get("revenue_growth_pct"),
         },
-        "redflags": flags,
+        "redflags": flags_list,
+        "disabled": disabled,
         "gaps": gaps,
-        "disclaimer": analyze.DISCLAIMER,
+        "filing_checklist": checklist,
+        "why": why,
+        "disclaimer": DISCLAIMER,
     }
     if as_json:
         return payload
@@ -147,11 +143,15 @@ def build_brief(f: Fundamentals, as_json: bool = False):
 def _render(b: dict) -> str:
     out = [
         f"═══ {b.get('name') or b['ticker']} ({b['ticker']}) — brief ═══",
-        analyze._source_line(b),
+        source_line(b),
         f"Sector: {b.get('sector') or 'n/a'} / {b.get('industry') or 'n/a'}",
-        f"Price: {_fmt_money(b.get('price'))}   Market cap: {_fmt_money(b.get('market_cap'))}",
+        f"Price: {fmt_money(b.get('price'))}   Market cap: {fmt_money(b.get('market_cap'))}",
         "",
     ]
+
+    if b.get("style"):
+        out += style_mod.style_focus(b["style"], b)
+        out.append("")
 
     rule = b.get("rule40")
     regime = (b.get("regime") or "unknown").replace("_", " ")
@@ -177,21 +177,30 @@ def _render(b: dict) -> str:
 
     v = b.get("valuation") or {}
     out.append("Valuation")
-    out.append(f"  EV / Sales:   {_mult(v.get('ev_sales'))}")
-    out.append(f"  EV / EBITDA:  {_mult(v.get('ev_ebitda'))}")
+    out.append(f"  EV / Sales:   {mult(v.get('ev_sales'))}")
+    out.append(f"  EV / EBITDA:  {mult(v.get('ev_ebitda'))}")
     if v.get("dcf_per_share") is not None:
-        out.append(f"  DCF / share:  {_fmt_money(v.get('dcf_per_share'))}  (heuristic)")
+        out.append(f"  DCF / share:  {fmt_money(v.get('dcf_per_share'))}  (heuristic)")
+        sc = (v.get("dcf_scenarios") or {}).get("growth") or {}
+        if sc:
+            bits = []
+            for name in ("bear", "base", "bull"):
+                row = sc.get(name)
+                if row and row.get("per_share") is not None:
+                    bits.append(f"{name} {fmt_money(row['per_share'])}")
+            if bits:
+                out.append(f"  DCF scenarios: {' · '.join(bits)}")
     else:
         out.append(f"  DCF / share:  n/a — {v.get('dcf_note') or 'not computed'}")
     out.append("")
 
     s = b.get("solvency") or {}
     out.append("Solvency / quality")
-    out.append(f"  Revenue growth: {_pct(s.get('revenue_growth_pct'))}")
-    out.append(f"  FCF margin:     {_pct(s.get('fcf_margin_pct'))}")
-    out.append(f"  Capex intensity: {_pct(s.get('capex_intensity_pct'))}")
-    out.append(f"  Dilution:       {_pct(s.get('share_dilution_pct'))}")
-    out.append(f"  Net debt:       {_fmt_money(s.get('net_debt'))}")
+    out.append(f"  Revenue growth: {pct(s.get('revenue_growth_pct'))}")
+    out.append(f"  FCF margin:     {pct(s.get('fcf_margin_pct'))}")
+    out.append(f"  Capex intensity: {pct(s.get('capex_intensity_pct'))}")
+    out.append(f"  Dilution:       {pct(s.get('share_dilution_pct'))}")
+    out.append(f"  Net debt:       {fmt_money(s.get('net_debt'))}")
     lev = s.get("net_debt_to_ebitda")
     if lev is not None:
         if lev < 0:
@@ -206,30 +215,28 @@ def _render(b: dict) -> str:
         out.append(f"  {fl.get('severity', '•')} {fl.get('flag')}: {fl.get('detail')}")
     out.append("")
 
-    gaps = b.get("gaps") or []
-    if gaps:
-        out.append("Gaps (not invented — what would unlock them)")
-        for g in gaps:
-            out.append(f"  · {g['field']}: {g['why']}")
-            out.append(f"      unlocks via: {g['unlocks']}")
-    else:
-        out.append("Gaps: none on the core fetched set")
+    out += diagnostics.render_disabled(b.get("disabled") or [])
+    out.append("")
+    out += diagnostics.render_filing_checklist(b.get("filing_checklist") or [])
 
-    out += ["", *analyze._footer()]
+    if b.get("why"):
+        out.append("")
+        out += explain.render_why(b["why"])
+
+    out += ["", *footer()]
     return "\n".join(out)
 
 
 def main(argv: list[str]) -> int:
-    args = [a for a in argv if not a.startswith("--")]
-    flags = {a for a in argv if a.startswith("--")}
-    if not args:
-        print("usage: python scripts/brief.py <TICKER> [--fixture] [--json]", file=sys.stderr)
-        return 2
-
-    f = load_for_cli(args[0], use_fixture="--fixture" in flags)
-    report = build_brief(f, as_json="--json" in flags)
-    print(json.dumps(report, indent=2) if "--json" in flags else report)
-    return 0 if f.available else 1
+    return run_single_ticker(
+        argv,
+        usage=(
+            "usage: python scripts/brief.py <TICKER> [--fixture] [--json] "
+            "[--style=value|growth|quality|risk] [--explain]"
+        ),
+        build=build_brief,
+        pass_flags=True,
+    )
 
 
 if __name__ == "__main__":

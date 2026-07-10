@@ -10,63 +10,62 @@ never diverge from `analyze`, `company`, or `framework`.
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-try:  # installed as the `finance_skills` package…
-    from finance_skills import analyze
-    from finance_skills.analyze import _fmt_money, _pct
-    from finance_skills.data import Fundamentals, get_fundamentals_or_fixture, load_fixture
-except ImportError:  # …or run directly via `python3 scripts/valuation.py` (skill path)
+if __package__:
+    from finance_skills import analyze, explain
+    from finance_skills.cli import has_flag, run_single_ticker
+    from finance_skills.data import Fundamentals
+    from finance_skills.format import fmt_money, leverage_cell, mult, pct, render_metric_table, source_line
+else:
     import analyze
-    from analyze import _fmt_money, _pct
-    from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
-
-
-def _mult(v) -> str:
-    return "n/a" if v is None else f"{v}x"
+    import explain
+    from cli import has_flag, run_single_ticker
+    from data import Fundamentals
+    from format import fmt_money, leverage_cell, mult, pct, render_metric_table, source_line
 
 
 def _rows(r: dict) -> list[tuple[str, str, str]]:
     """Build (metric, value, read) rows for the valuation table."""
     d = r["derived"]
     rows: list[tuple[str, str, str]] = [
-        ("Price", _fmt_money(r.get("price")), "—"),
-        ("Market cap", _fmt_money(r.get("market_cap")), "—"),
+        ("Price", fmt_money(r.get("price")), "—"),
+        ("Market cap", fmt_money(r.get("market_cap")), "—"),
     ]
 
     ev = d.get("enterprise_value")
-    rows.append(("Enterprise value", _fmt_money(ev) if ev is not None else "n/a",
+    rows.append(("Enterprise value", fmt_money(ev) if ev is not None else "n/a",
                  "market cap + net debt" if ev is not None else "net debt unknown"))
 
-    # EV / Sales — the cleaner multiple when FCF is negative and EBITDA distorted.
     evs = d.get("ev_sales")
-    rows.append(("EV / Sales", _mult(evs), _ev_sales_read(evs)))
+    rows.append(("EV / Sales", mult(evs), _ev_sales_read(evs)))
 
-    # EV / EBITDA — flag when EBITDA margin > 100% (non-operating items inflate it).
     eve, em = d.get("ev_ebitda"), d.get("ebitda_margin_pct")
     if em is not None and em > 100 and eve is not None:
         eve_read = "⚠ distorted — EBITDA margin >100% (non-operating items); trust EV/Sales more"
     elif eve is None:
-        # Name the actual missing input rather than blaming EBITDA generically.
         eve_read = "net debt unknown" if ev is None else "needs positive EBITDA"
     else:
         eve_read = _ev_ebitda_read(eve)
-    rows.append(("EV / EBITDA", _mult(eve), eve_read))
+    rows.append(("EV / EBITDA", mult(eve), eve_read))
 
-    # DCF — intrinsic value per share, or why it's skipped.
     if "dcf" in r:
         ps = r["dcf"].get("per_share")
-        rows.append(("DCF / share", _fmt_money(ps), _dcf_read(ps, r.get("price"))))
+        rows.append(("DCF / share", fmt_money(ps), _dcf_read(ps, r.get("price"))))
     else:
         note = r.get("dcf_note", "not computed")
-        short = "FCF negative — DCF skipped" if "not positive" in note else note
+        if "not positive" in note:
+            short = "FCF negative — DCF skipped"
+        elif "net debt unknown" in note.lower():
+            short = "net debt unknown — DCF skipped"
+        else:
+            short = note
         rows.append(("DCF / share", "n/a", short))
 
-    # Rule of 40 — the segment-aware pass/fail vs its benchmark.
     rule = r.get("rule40")
     if rule:
         verdict = "PASS" if rule["passes"] else "BELOW BAR"
@@ -75,15 +74,10 @@ def _rows(r: dict) -> list[tuple[str, str, str]]:
     elif "rule40_note" in r:
         rows.append(("Rule of 40", "n/a", "insufficient margin data"))
 
-    rows.append(("Revenue growth", _pct(d.get("revenue_growth_pct")), _growth_read(d.get("revenue_growth_pct"))))
-    rows.append(("FCF margin", _pct(d.get("fcf_margin_pct")), _fcf_read(d.get("fcf_margin_pct"))))
+    rows.append(("Revenue growth", pct(d.get("revenue_growth_pct")), _growth_read(d.get("revenue_growth_pct"))))
+    rows.append(("FCF margin", pct(d.get("fcf_margin_pct")), _fcf_read(d.get("fcf_margin_pct"))))
     if "leverage" in r:
-        x = r["leverage"]["net_debt_to_ebitda"]
-        # Negative net debt is net cash, not "low leverage" — say so and drop the sign.
-        if x < 0:
-            value, read = f"net cash ({abs(x)}x)", "net cash — no leverage risk"
-        else:
-            value, read = f"{x}x", "low leverage" if x < 3 else "elevated — watch refinancing"
+        value, read = leverage_cell(r["leverage"]["net_debt_to_ebitda"])
         rows.append(("Net debt / EBITDA", value, read))
     return rows
 
@@ -116,8 +110,8 @@ def _dcf_read(ps, price) -> str:
     if ps is None or price is None:
         return "heuristic estimate"
     if ps >= price:
-        return f"above price {_fmt_money(price)} → cheap on this DCF (heuristic)"
-    return f"below price {_fmt_money(price)} → rich on this DCF (heuristic)"
+        return f"above price {fmt_money(price)} → cheap on this DCF (heuristic)"
+    return f"below price {fmt_money(price)} → rich on this DCF (heuristic)"
 
 
 def _growth_read(v) -> str:
@@ -143,58 +137,80 @@ def _verdict(r: dict) -> str:
     if "dcf" in r and r["dcf"].get("per_share") is not None and r.get("price") is not None:
         ps, price = r["dcf"]["per_share"], r["price"]
         stance = "screens cheap" if ps >= price else "screens rich"
-        return f"{stance} vs a heuristic DCF near {_fmt_money(ps)}/share; corroborate with the multiples above."
+        return f"{stance} vs a heuristic DCF near {fmt_money(ps)}/share; corroborate with the multiples above."
     evs = d.get("ev_sales")
     if evs is None:
-        # Neither an intrinsic anchor (no positive-FCF DCF) nor an EV multiple is
-        # available — don't assert a valuation on no data.
         return ("No positive-FCF DCF and EV/Sales isn't computable (net debt or revenue "
                 "unknown), so there isn't enough data to call it cheap or expensive.")
+    note = r.get("dcf_note") or ""
+    if "net debt unknown" in note.lower():
+        return (f"No equity DCF (net debt unknown) — expensive on EV/Sales {evs}x only if EV "
+                "itself is known; verify debt/cash before anchoring on multiples.")
     return (f"No DCF (FCF not positive), so it can't be anchored to intrinsic value — "
             f"expensive on EV/Sales {evs}x; a growth/backlog bet, not supported by current cash flows.")
 
 
-def build_valuation(f: Fundamentals, as_json: bool = False):
-    report = analyze.build_report(f, as_json=True)
-    if isinstance(report, dict) and not report.get("available", True):
-        return report if as_json else analyze.build_report(f, as_json=False)
+def _scenario_lines(report: dict) -> list[str]:
+    sc = report.get("dcf_scenarios")
+    if not sc:
+        note = report.get("dcf_note")
+        return [f"Scenarios: n/a — {note}"] if note else []
+    lines = ["Scenarios (heuristic DCF — not a target price)"]
+    lines.append("  Growth (bear / base / bull):")
+    for name, row in (sc.get("growth") or {}).items():
+        vs = row.get("vs_price_pct")
+        vs_s = f" ({vs:+.1f}% vs price)" if vs is not None else ""
+        lines.append(
+            f"    {name:4s}  {fmt_money(row['per_share'])}/sh  "
+            f"g={row['growth_rate']}%  r={row['discount_rate']}%{vs_s}"
+        )
+    lines.append("  Discount-rate sensitivity (base growth):")
+    for label, row in (sc.get("discount_rate") or {}).items():
+        lines.append(f"    {label:8s}  {fmt_money(row['per_share'])}/sh")
+    lines.append("  FCF conversion (×0.8 / ×1.0 / ×1.2 on starting FCF):")
+    for label, row in (sc.get("fcf_conversion") or {}).items():
+        lines.append(f"    {label:8s}  {fmt_money(row['per_share'])}/sh")
+    return lines
+
+
+def build_valuation(f: Fundamentals, as_json: bool = False, flags: set[str] | None = None):
+    flags = flags or set()
+    report = analyze.build_report(f)
+    if not report.get("available", True):
+        return report if as_json else analyze.format_report(report)
     rows = _rows(report)
+    why = explain.why_lines_for_report(report) if has_flag(flags, "explain") else []
     if as_json:
-        return {"ticker": report["ticker"], "verdict": _verdict(report),
-                "rows": [{"metric": m, "value": v, "read": rd} for m, v, rd in rows]}
-    return _render(report, rows)
-
-
-def _render(r: dict, rows: list[tuple[str, str, str]]) -> str:
-    mw = max(len(m) for m, _, _ in rows)
-    vw = max(len(v) for _, v, _ in rows)
-    out = [
-        f"═══ {r['name'] or r['ticker']} ({r['ticker']}) — valuation ═══",
-        analyze._source_line(r),
-        "",
-        f"  {'Metric'.ljust(mw)}   {'Value'.ljust(vw)}   Read",
-        f"  {'─' * (mw + vw + 40)}",
+        return {
+            "ticker": report["ticker"],
+            "verdict": _verdict(report),
+            "rows": [{"metric": m, "value": v, "read": rd} for m, v, rd in rows],
+            "dcf_scenarios": report.get("dcf_scenarios"),
+            "dcf_note": report.get("dcf_note"),
+            "why": why,
+        }
+    title = [
+        f"═══ {report['name'] or report['ticker']} ({report['ticker']}) — valuation ═══",
+        source_line(report),
     ]
-    for m, v, rd in rows:
-        out.append(f"  {m.ljust(mw)}   {v.ljust(vw)}   {rd}")
-    out += ["", f"Verdict: {_verdict(r)}", *analyze._footer()]
-    return "\n".join(out)
+    extra: list[str] = []
+    sc_lines = _scenario_lines(report)
+    if sc_lines:
+        extra += sc_lines
+    if why:
+        if extra:
+            extra.append("")
+        extra += explain.render_why(why)
+    return render_metric_table(title, rows, verdict=_verdict(report), extra_lines=extra or None)
 
 
 def main(argv: list[str]) -> int:
-    args = [a for a in argv if not a.startswith("--")]
-    flags = {a for a in argv if a.startswith("--")}
-    if not args:
-        print("usage: python scripts/valuation.py <TICKER> [--fixture] [--json]", file=sys.stderr)
-        return 2
-    ticker = args[0].upper()
-    if "--fixture" in flags:
-        f = load_fixture(ticker) or Fundamentals(ticker=ticker, available=False, error="no fixture for this ticker")
-    else:
-        f = get_fundamentals_or_fixture(ticker)
-    report = build_valuation(f, as_json="--json" in flags)
-    print(json.dumps(report, indent=2) if "--json" in flags else report)
-    return 0 if f.available else 1  # surface unavailable/missing-fixture to callers
+    return run_single_ticker(
+        argv,
+        usage="usage: python scripts/valuation.py <TICKER> [--fixture] [--json] [--explain]",
+        build=build_valuation,
+        pass_flags=True,
+    )
 
 
 if __name__ == "__main__":

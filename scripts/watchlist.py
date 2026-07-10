@@ -1,4 +1,4 @@
-"""watchlist — save a set of tickers and run any verb across all of them.
+"""watchlist — save a set of tickers and run any exportable verb across all of them.
 
     python scripts/watchlist.py add NVDA AMD NBIS
     python scripts/watchlist.py list
@@ -20,29 +20,24 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-try:  # installed as the `finance_skills` package…
-    from finance_skills import analyze, health, redflags, valuation
+if __package__:
+    from finance_skills import analyze, rank
     from finance_skills import compare as compare_mod
-    from finance_skills.data import CACHE_DIR, Fundamentals, get_fundamentals_or_fixture, load_fixture
-except ImportError:  # …or run directly via `python3 scripts/watchlist.py` (skill path)
+    from finance_skills.cli import flag_value, parse_argv
+    from finance_skills.data import CACHE_DIR, load_for_cli
+    from finance_skills.router import WATCHLIST_VERBS, load_builder
+else:
     import analyze
     import compare as compare_mod
-    import health
-    import redflags
-    import valuation
-    from data import CACHE_DIR, Fundamentals, get_fundamentals_or_fixture, load_fixture
+    import rank
+    from cli import flag_value, parse_argv
+    from data import CACHE_DIR, load_for_cli
+    from router import WATCHLIST_VERBS, load_builder
 
 STORE = CACHE_DIR / "watchlists.json"
-
-# verb -> single-ticker build function (text). `compare` is handled specially.
-VERBS = {
-    "analyze":   analyze.build_report,
-    "valuation": valuation.build_valuation,
-    "health":    health.build_health,
-    "redflags":  redflags.build_redflags,
-}
 
 
 def _load() -> dict[str, list[str]]:
@@ -61,23 +56,9 @@ def _get(data: dict, name: str) -> list[str]:
     return data.get(name, [])
 
 
-def _fetch(ticker: str, use_fixture: bool) -> Fundamentals:
-    if use_fixture:
-        return load_fixture(ticker) or Fundamentals(ticker=ticker, available=False, error="no fixture for this ticker")
-    return get_fundamentals_or_fixture(ticker)
-
-
-def _flag_value(flags: set[str], name: str, default: str) -> str:
-    for fl in flags:
-        if fl.startswith(f"--{name}="):
-            return fl.split("=", 1)[1]
-    return default
-
-
 def main(argv: list[str]) -> int:
-    args = [a for a in argv if not a.startswith("--")]
-    flags = {a for a in argv if a.startswith("--")}
-    name = _flag_value(flags, "name", "default")
+    args, flags = parse_argv(argv)
+    name = flag_value(flags, "name", "default")
     use_fixture = "--fixture" in flags
 
     if not args:
@@ -129,25 +110,42 @@ def main(argv: list[str]) -> int:
             print(f"[{name}] is empty — add tickers first.", file=sys.stderr)
             return 1
 
-        if verb == "compare":
+        if verb in ("compare", "rank"):
             reports = []
             for t in tickers:
-                rep = analyze.build_report(_fetch(t, use_fixture), as_json=True)
-                if isinstance(rep, dict) and rep.get("available", True):
+                rep = analyze.build_report(load_for_cli(t, use_fixture=use_fixture))
+                if rep.get("available", True):
                     reports.append(rep)
+            if verb == "rank":
+                if not reports:
+                    print("No tickers with data to rank.", file=sys.stderr)
+                    return 1
+                ranking = rank.rank_reports(reports)
+                print("\n".join(rank.render_ranking(ranking)))
+                print(f"\n[{name}] {', '.join(r['ticker'] for r in reports)}")
+                return 0
             if len(reports) < 2:
                 print("Need at least two tickers with data to compare.", file=sys.stderr)
                 return 1
             print(compare_mod.build_compare(reports, as_json=False))
             return 0
 
-        build = VERBS.get(verb)
-        if build is None:
-            print(f"unknown verb {verb!r}. Try: {', '.join(VERBS)}, compare", file=sys.stderr)
+        if verb not in WATCHLIST_VERBS:
+            print(
+                f"unknown verb {verb!r}. Try: {', '.join(sorted(WATCHLIST_VERBS))}, compare, rank",
+                file=sys.stderr,
+            )
             return 2
+        build = load_builder(verb)
+        reports = []
         for t in tickers:
-            print(build(_fetch(t, use_fixture), as_json=False))
+            f = load_for_cli(t, use_fixture=use_fixture)
+            print(build(f, False))
             print()
+            if f.available:
+                reports.append(analyze.build_report(f))
+        if len(reports) >= 2:
+            print("\n".join(rank.render_ranking(rank.rank_reports(reports))))
         return 0
 
     print(f"unknown command {cmd!r}. Use add / remove / list / clear / run.", file=sys.stderr)
