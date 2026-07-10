@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-07-11
+
+### Changed
+- **README rewritten as “AI agent financial skill”** — problem-first hero, vs ChatGPT /
+  vs MCP, real fail-closed sample, agent-oriented install. Discoverability positioning
+  for Claude Code / Codex / Cursor / AI engineers (not investors).
+
 ## [0.5.1] - 2026-07-11
 
 ### Changed

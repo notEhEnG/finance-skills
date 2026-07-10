@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "finance-skills"
-version = "0.5.1"
-description = "Analyst-style equity research over one shared engine: segment-aware Rule of 40, DCF, red flags, screening — read-only, not investment advice."
+version = "0.5.2"
+description = "AI agent financial skill: real fundamentals, deterministic Rule of 40/DCF/red flags, fail-closed when data is missing — so agents stop inventing stock numbers."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
