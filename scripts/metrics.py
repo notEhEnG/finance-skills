@@ -16,7 +16,7 @@ All margins and growth rates are expressed in PERCENT (e.g. 40.0 == 40%).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 
 # --- Growth regimes -------------------------------------------------------
 

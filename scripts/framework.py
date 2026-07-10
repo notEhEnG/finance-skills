@@ -22,11 +22,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 try:  # installed as the `finance_skills` package…
     from finance_skills import analyze
-    from finance_skills.analyze import _fmt_money, _pct
+    from finance_skills.analyze import _pct
     from finance_skills.data import Fundamentals, get_fundamentals_or_fixture, load_fixture
 except ImportError:  # …or run directly via `python3 scripts/framework.py` (skill path)
     import analyze
-    from analyze import _fmt_money, _pct
+    from analyze import _pct
     from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
 
 # Each metric is (label, source-key, reader). `source` is either a callable that

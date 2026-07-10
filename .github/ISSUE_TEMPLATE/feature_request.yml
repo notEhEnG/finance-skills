@@ -1,0 +1,27 @@
+name: Feature request
+description: Propose a new verb, framework, metric, or sector lens
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What investor question would this answer?
+      description: Phrase it the way a user would ask it.
+      placeholder: "Is this bank over-reserved relative to peers?"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+      description: Which shared-engine numbers back it? What (if anything) needs a disclosed KPI?
+    validations:
+      required: true
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Fits the project principles
+      options:
+        - label: It's a *view* over the shared engine (numbers won't diverge from other verbs).
+        - label: It never fabricates a metric — missing/disclosed KPIs are flagged, not faked.
+        - label: It stays read-only (no trading, no account access).

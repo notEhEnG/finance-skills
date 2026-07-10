@@ -19,13 +19,38 @@ reads public market data.
 from __future__ import annotations
 
 import json
+import re
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 CACHE_DIR = Path(__file__).resolve().parent.parent / ".cache"
 CACHE_TTL_SECONDS = 60 * 60 * 6  # 6h; fundamentals change slowly
+
+# A ticker is interpolated into a cache filename, so it is untrusted input on the
+# one write surface. Constrain it to real symbol characters (letters, digits, and
+# the class/exchange separators . _ -) with an alphanumeric first char — no path
+# separators, no leading dot. This deletes the path-traversal class at the
+# boundary rather than sanitising per call site. BRK.B / RDS.A still pass.
+_TICKER_RE = re.compile(r"^[A-Z0-9][A-Z0-9._-]{0,15}$")
+
+
+def normalize_ticker(ticker: str) -> str:
+    """Upper-case and validate a ticker, or raise ValueError.
+
+    Public boundary helper — every CLI door should use this (or `load_for_cli`)
+    so path-unsafe symbols never reach the cache filename. Callers that must
+    never raise (e.g. get_fundamentals) catch ValueError and return unavailable.
+    """
+    t = ticker.strip().upper()
+    if not _TICKER_RE.fullmatch(t):
+        raise ValueError(f"invalid ticker: {ticker!r}")
+    return t
+
+
+# Back-compat private alias (tests / older call sites).
+_normalize_ticker = normalize_ticker
 
 
 @dataclass
@@ -73,7 +98,12 @@ def _now_iso() -> str:
 
 
 def _cache_path(ticker: str) -> Path:
-    return CACHE_DIR / f"{ticker.upper()}.json"
+    # Defense-in-depth: even though callers normalize, refuse any path that would
+    # resolve outside CACHE_DIR (a second line against traversal on the write surface).
+    path = CACHE_DIR / f"{_normalize_ticker(ticker)}.json"
+    if path.resolve().parent != CACHE_DIR.resolve():
+        raise ValueError(f"cache path escapes CACHE_DIR for ticker {ticker!r}")
+    return path
 
 
 def _read_cache(ticker: str) -> Fundamentals | None:
@@ -161,7 +191,12 @@ def _col(df, keys, column=0):
 
 def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
     """Fetch and normalise fundamentals for `ticker`. Never raises."""
-    ticker = ticker.strip().upper()
+    try:
+        ticker = _normalize_ticker(ticker)
+    except ValueError as exc:
+        # Reject before any cache read/write — a malformed ticker must never reach
+        # the filesystem path builder (path-traversal guard on the write surface).
+        return Fundamentals(ticker=ticker.strip().upper(), available=False, error=str(exc))
 
     if use_cache:
         cached = _read_cache(ticker)
@@ -269,7 +304,11 @@ _FIXTURES = {
 
 def load_fixture(ticker: str) -> Fundamentals | None:
     """Return a synthetic sample record for offline demos/tests, or None."""
-    return _FIXTURES.get(ticker.strip().upper())
+    try:
+        t = normalize_ticker(ticker)
+    except ValueError:
+        return None
+    return _FIXTURES.get(t)
 
 
 def get_fundamentals_or_fixture(ticker: str, use_cache: bool = True) -> Fundamentals:
@@ -282,3 +321,16 @@ def get_fundamentals_or_fixture(ticker: str, use_cache: bool = True) -> Fundamen
     if fixture is not None:
         return fixture
     return live  # unavailable, with its error message intact
+
+
+def load_for_cli(ticker: str, *, use_fixture: bool = False) -> Fundamentals:
+    """Validate ticker then load fixture or live/fixture-fallback. Never raises."""
+    try:
+        t = normalize_ticker(ticker)
+    except ValueError as exc:
+        return Fundamentals(ticker=ticker.strip().upper(), available=False, error=str(exc))
+    if use_fixture:
+        return load_fixture(t) or Fundamentals(
+            ticker=t, available=False, error="no fixture for this ticker"
+        )
+    return get_fundamentals_or_fixture(t)

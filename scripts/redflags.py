@@ -20,75 +20,80 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 try:  # installed as the `finance_skills` package…
     from finance_skills import analyze
-    from finance_skills.analyze import _fmt_money, _pct
+    from finance_skills.analyze import _pct
     from finance_skills.data import Fundamentals, get_fundamentals_or_fixture, load_fixture
 except ImportError:  # …or run directly via `python3 scripts/redflags.py` (skill path)
     import analyze
-    from analyze import _fmt_money, _pct
+    from analyze import _pct
     from data import Fundamentals, get_fundamentals_or_fixture, load_fixture
 
 HIGH, MED, LOW = "⛔", "⚠", "•"
+_SEV_RANK = {HIGH: 0, MED: 1, LOW: 2}
 
 
-def _flags(r: dict) -> list[dict]:
-    """Return a list of {severity, flag, detail} — empty means nothing tripped."""
-    d = r["derived"]
+def flags_for(report: dict, *, limit: int | None = None) -> list[dict]:
+    """Public flag list for a `build_report` dict — sorted high→low severity.
+
+    Used by `redflags` and `brief` (default stack). Prefer this over private
+    helpers so the default path doesn't depend on underscore APIs.
+    """
+    d = report["derived"]
     out: list[dict] = []
 
     def add(sev, flag, detail):
         out.append({"severity": sev, "flag": flag, "detail": detail})
 
-    # Cash burn — negative FCF is the headline solvency question for growth names.
     fcf_m = d.get("fcf_margin_pct")
     if fcf_m is not None and fcf_m < 0:
         sev = HIGH if fcf_m < -50 else MED
         add(sev, "Cash burn", f"FCF margin {_pct(fcf_m)} — spends more cash than it earns; depends on funding.")
 
-    # Shrinking top line.
     g = d.get("revenue_growth_pct")
     if g is not None and g < 0:
         add(HIGH, "Revenue shrinking", f"Revenue down {_pct(g)} YoY — the story is contraction, not growth.")
 
-    # Dilution — revenue 'bought' with equity erodes per-share value.
     dil = d.get("share_dilution_pct")
     if dil is not None and dil > 5:
         sev = HIGH if dil > 15 else MED
         add(sev, "Heavy dilution", f"Share count up {_pct(dil)} YoY — existing holders are being diluted.")
 
-    # Leverage.
-    lev = r.get("leverage", {}).get("net_debt_to_ebitda")
+    lev = (report.get("leverage") or {}).get("net_debt_to_ebitda")
     if lev is not None and lev >= 3:
         sev = HIGH if lev >= 5 else MED
         add(sev, "Elevated leverage", f"Net debt / EBITDA = {lev}x — refinancing risk if rates or growth turn.")
 
-    # Capital-intensity gap — EBITDA looks healthy but cash doesn't.
-    rule = r.get("rule40")
+    rule = report.get("rule40")
     if rule and rule.get("capital_intensity_gap", 0) > 40:
         add(MED, "Capital-intensity gap",
             f"EBITDA Rule-40 beats FCF Rule-40 by {rule['capital_intensity_gap']:.0f} pts — "
             "growth is capex-funded, not organically profitable.")
 
-    # Distorted EBITDA — non-operating items inflating the multiple.
     em = d.get("ebitda_margin_pct")
     if em is not None and em > 100:
         add(MED, "Distorted EBITDA", f"EBITDA margin {_pct(em)} (>100%) — non-operating items inflate it; trust EV/Sales.")
 
-    # No intrinsic anchor.
-    if "dcf" not in r and d.get("ev_sales") is not None and d.get("ev_sales") >= 20:
+    if "dcf" not in report and d.get("ev_sales") is not None and d.get("ev_sales") >= 20:
         add(MED, "Priced on hope", f"No positive-FCF DCF and EV/Sales {d['ev_sales']}x — a growth bet, not cash-flow-backed.")
 
-    # Missing data we would need to clear a flag — call it out, don't assume clean.
     if d.get("net_debt") is None:
         add(LOW, "Net debt unknown", "Debt or cash not disclosed in the fetched data — leverage can't be judged; check the balance sheet.")
 
+    out.sort(key=lambda x: _SEV_RANK.get(x["severity"], 9))
+    if limit is not None:
+        return out[:limit]
     return out
+
+
+def _flags(r: dict) -> list[dict]:
+    """Back-compat alias for flags_for."""
+    return flags_for(r)
 
 
 def build_redflags(f: Fundamentals, as_json: bool = False):
     report = analyze.build_report(f, as_json=True)
     if isinstance(report, dict) and not report.get("available", True):
         return report if as_json else analyze.build_report(f, as_json=False)
-    flags = _flags(report)
+    flags = flags_for(report)
     if as_json:
         return {"ticker": report["ticker"], "flag_count": len(flags), "flags": flags}
     return _render(report, flags)

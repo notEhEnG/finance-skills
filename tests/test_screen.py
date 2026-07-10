@@ -46,6 +46,34 @@ class TestEvaluate(unittest.TestCase):
         with self.assertRaises(screen.RuleError):
             screen.evaluate("   ", _report("CRWV"))
 
+    def test_code_injection_is_rejected_not_evaluated(self):
+        # The rule language is a parser, not eval — hostile input must raise
+        # RuleError (bad field/clause), never execute.
+        hostile = [
+            "__import__('os').system('echo pwned')",
+            "growth > 0 or __import__('os')",
+            "1; import os",
+            "eval('2+2') > 0",
+            "growth.__class__ > 0",
+            "() or True",
+            "growth > 0 and (drop table)",
+        ]
+        rep = _report("CRWV")
+        for rule in hostile:
+            with self.assertRaises(screen.RuleError, msg=f"should reject: {rule!r}"):
+                screen.evaluate(rule, rep)
+
+    def test_value_must_be_numeric(self):
+        # Comparing a field to a non-number is a parse error, not a crash.
+        with self.assertRaises(screen.RuleError):
+            screen.evaluate("growth > abc", _report("CRWV"))
+
+    def test_only_whitelisted_fields_are_reachable(self):
+        # Every field referenced in a rule must be in the FIELDS whitelist.
+        for name in ("os", "system", "import", "class", "globals"):
+            with self.assertRaises(screen.RuleError):
+                screen.evaluate(f"{name} > 0", _report("CRWV"))
+
 
 class TestScreen(unittest.TestCase):
     def test_screen_over_fixtures(self):

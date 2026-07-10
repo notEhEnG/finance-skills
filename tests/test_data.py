@@ -1,4 +1,5 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -61,6 +62,110 @@ class TestStatementOrdering(unittest.TestCase):
     def test_non_date_labels_left_unchanged(self):
         df = pd.DataFrame([[1.0, 2.0]], index=["Total Revenue"], columns=["latest", "prior"])
         self.assertIs(data._order_latest_first(df), df)
+
+
+class TestNumCoercion(unittest.TestCase):
+    def test_num_guards(self):
+        self.assertIsNone(data._num(None))
+        self.assertIsNone(data._num("not-a-number"))
+        self.assertIsNone(data._num(float("nan")))
+        self.assertEqual(data._num("3.5"), 3.5)
+        self.assertEqual(data._num(5), 5.0)
+
+
+class TestFixtureFallback(unittest.TestCase):
+    def test_load_fixture_known_and_unknown(self):
+        self.assertEqual(data.load_fixture("crwv").ticker, "CRWV")  # case-insensitive
+        self.assertIsNone(data.load_fixture("ZZZZ"))
+
+    def test_or_fixture_falls_back_when_live_unavailable(self):
+        # Force the live path to fail (no network in tests) and confirm the
+        # fixture fallback kicks in for a ticker that has one, but not otherwise.
+        orig = data.get_fundamentals
+        data.get_fundamentals = lambda t, use_cache=True: data.Fundamentals(
+            ticker=t.upper(), available=False, error="forced-unavailable")
+        try:
+            self.assertEqual(data.get_fundamentals_or_fixture("CRWV").source, "fixture")
+            self.assertFalse(data.get_fundamentals_or_fixture("ZZZZ").available)
+        finally:
+            data.get_fundamentals = orig
+
+
+class TestTickerTraversal(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig = data.CACHE_DIR
+        # A nested cache dir so an escaping path would land in the temp root.
+        data.CACHE_DIR = Path(self._tmp.name) / "cache"
+
+    def tearDown(self):
+        data.CACHE_DIR = self._orig
+        self._tmp.cleanup()
+
+    def test_normalize_accepts_real_symbols(self):
+        self.assertEqual(data._normalize_ticker("nvda"), "NVDA")
+        self.assertEqual(data._normalize_ticker(" brk.b "), "BRK.B")
+        self.assertEqual(data._normalize_ticker("RDS.A"), "RDS.A")
+
+    def test_normalize_rejects_traversal_and_junk(self):
+        for bad in ["../evil", "a/b", "..", "", "/etc/passwd", "x" * 20, ".hidden", "a\\b"]:
+            with self.assertRaises(ValueError, msg=f"should reject {bad!r}"):
+                data._normalize_ticker(bad)
+
+    def test_cache_path_refuses_to_escape(self):
+        for bad in ["../evil", "a/b", ".."]:
+            with self.assertRaises(ValueError):
+                data._cache_path(bad)
+
+    def test_get_fundamentals_rejects_bad_ticker_without_writing(self):
+        f = data.get_fundamentals("../evil", use_cache=False)  # offline: returns before any fetch
+        self.assertFalse(f.available)
+        self.assertIn("invalid ticker", f.error)
+        # Nothing may be written anywhere under the temp root.
+        leaked = list(Path(self._tmp.name).rglob("*.json"))
+        self.assertEqual(leaked, [], f"a file escaped the cache dir: {leaked}")
+
+    def test_or_fixture_also_rejects_bad_ticker(self):
+        f = data.get_fundamentals_or_fixture("../../etc/passwd", use_cache=False)
+        self.assertFalse(f.available)
+
+
+class TestCache(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig_dir, self._orig_ttl = data.CACHE_DIR, data.CACHE_TTL_SECONDS
+        data.CACHE_DIR = Path(self._tmp.name)
+
+    def tearDown(self):
+        data.CACHE_DIR, data.CACHE_TTL_SECONDS = self._orig_dir, self._orig_ttl
+        self._tmp.cleanup()
+
+    def _sample(self):
+        return data.Fundamentals(ticker="TEST", available=True, revenue=100.0, source="yfinance")
+
+    def test_write_then_read_roundtrip(self):
+        data._write_cache(self._sample())
+        got = data._read_cache("TEST")
+        self.assertIsNotNone(got)
+        self.assertEqual(got.revenue, 100.0)
+
+    def test_get_fundamentals_serves_fresh_cache_without_network(self):
+        data._write_cache(self._sample())
+        got = data.get_fundamentals("TEST", use_cache=True)  # must not hit the network
+        self.assertTrue(got.available)
+        self.assertEqual(got.revenue, 100.0)
+
+    def test_stale_cache_is_ignored(self):
+        data._write_cache(self._sample())
+        data.CACHE_TTL_SECONDS = -1  # everything is now "stale"
+        self.assertIsNone(data._read_cache("TEST"))
+
+    def test_corrupt_cache_is_ignored(self):
+        (data.CACHE_DIR / "TEST.json").write_text("{ not json", encoding="utf-8")
+        self.assertIsNone(data._read_cache("TEST"))
+
+    def test_missing_cache_returns_none(self):
+        self.assertIsNone(data._read_cache("NOPE"))
 
 
 if __name__ == "__main__":
