@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-07-11
+
 ### Added (agent middleware P0–P2)
 - **Strict agent contract** in `SKILL.md` + `docs/agent-policy.md` (activation,
   sole-source evidence, response order, refuse personal advice, untrusted data).
@@ -14,6 +16,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Canonical EngineReport envelope** (`scripts/report_schema.py`,
   `docs/engine-report.schema.json`) attached to brief `--json` as `engine_report`.
 - Routing table tests (40+) and schema/projection tests.
+- Agent threat model section in `SECURITY.md`.
 
 ## [0.5.2] - 2026-07-11
 
