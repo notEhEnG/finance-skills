@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/notEhEnG/finance-skills/docs/engine-report.schema.json",
+  "title": "finance-skills EngineReport",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "request",
+    "company",
+    "source",
+    "source_facts",
+    "calculations",
+    "flags",
+    "disabled_analyses",
+    "filing_verification_checklist",
+    "response_guidance",
+    "errors",
+    "warnings"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "request": { "type": "object" },
+    "company": { "type": "object" },
+    "source": {
+      "type": "object",
+      "required": ["provider", "data_state"],
+      "properties": {
+        "data_state": {
+          "type": "string",
+          "enum": [
+            "live", "cache", "fixture", "unavailable", "unknown",
+            "invalid", "stale", "not_applicable", "disabled"
+          ]
+        }
+      }
+    },
+    "source_facts": { "type": "array" },
+    "calculations": { "type": "array" },
+    "flags": { "type": "array" },
+    "disabled_analyses": { "type": "array" },
+    "filing_verification_checklist": { "type": "array" },
+    "response_guidance": {
+      "type": "object",
+      "required": ["permitted_claims", "prohibited_claims", "mandatory_caveats"]
+    },
+    "errors": { "type": "array" },
+    "warnings": { "type": "array" }
+  }
+}

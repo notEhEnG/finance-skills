@@ -26,7 +26,7 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 if __package__:
-    from finance_skills import analyze, diagnostics, explain, redflags
+    from finance_skills import analyze, diagnostics, explain, redflags, report_schema
     from finance_skills import style as style_mod
     from finance_skills.cli import flag_value, has_flag, run_single_ticker
     from finance_skills.data import Fundamentals
@@ -36,6 +36,7 @@ else:
     import diagnostics
     import explain
     import redflags
+    import report_schema
     import style as style_mod
     from cli import flag_value, has_flag, run_single_ticker
     from data import Fundamentals
@@ -137,7 +138,15 @@ def build_brief(f: Fundamentals, as_json: bool = False, flags: set[str] | None =
         "disclaimer": DISCLAIMER,
     }
     if as_json:
-        return payload
+        envelope = report_schema.envelope_from_build_report(
+            report,
+            fundamentals=f,
+            disabled_raw=disabled,
+            flags_raw=flags_list,
+            checklist=checklist,
+            invocation_mode="agent",
+        )
+        return report_schema.project_brief_payload(envelope, payload)
     return _render(payload)
 
 

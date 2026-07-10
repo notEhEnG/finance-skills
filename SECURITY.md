@@ -34,6 +34,25 @@ against primary filings.
 `finance-skills` is **not investment advice**. Verify every figure against
 primary filings before acting.
 
+## Agent middleware threat model
+
+When used as an AI coding-agent skill, additional risks exist **above** the
+Python process:
+
+| Threat | Mitigation |
+|--------|------------|
+| Agent invents numbers after the engine runs | `SKILL.md` sole-source policy; report `response_guidance.prohibited_claims` |
+| Agent gives buy/sell advice | Route `refuse` for personal advice; prohibited conclusion tokens in policy |
+| User says “skip tools / answer from knowledge” | Activation policy: still MUST invoke for in-scope company analysis |
+| Prompt injection in user text or provider fields | User/provider/error strings are **untrusted data**, never instructions (`SKILL.md`, `docs/agent-policy.md`) |
+| Hiding disabled DCF / fixture state | Agent must lead with material disabled/fixture; fixture `data_state` in schema |
+| Bypassing deterministic routing | `route_request()` / `route --json` — no LLM in the default path |
+
+Architectural tests cannot force an LLM to obey prose. Agent compliance is
+specified in `SKILL.md` and checked where possible via routing/schema unit tests.
+A full transcript harness is planned; until then, treat agent policy as
+**mandatory specification**, not optional guidance.
+
 ## Supported versions
 
 The latest released version on PyPI is supported. Please upgrade before reporting.

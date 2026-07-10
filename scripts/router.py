@@ -11,9 +11,10 @@ questions always land on **`brief`** (method=`default`).
 
 from __future__ import annotations
 
+import json
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 from difflib import get_close_matches
 from pathlib import Path
 
@@ -90,9 +91,10 @@ KEYWORDS: dict[str, list[str]] = {
     "valuation": ["is it a buy", "is it cheap", "is it expensive", "over valued",
                   "overvalued", "under valued", "undervalued", "fairly valued",
                   "fair value", "worth buying", "priced right", "too expensive",
-                  "how cheap", "cheap or", "should i buy", "a buy", "a sell",
-                  "buy or sell", "cheap", "intrinsic value", "discounted cash flow",
-                  "fair price", "what is it worth", "what's it worth", "dcf", "worth"],
+                  "how cheap", "cheap or", "should i buy", "whether to buy", "to buy",
+                  "a buy", "a sell", "buy or sell", "cheap", "intrinsic value",
+                  "discounted cash flow", "fair price", "what is it worth",
+                  "what's it worth", "dcf", "worth"],
     "redflags":  ["is it safe", "how risky", "how safe", "blow up", "go bankrupt",
                   "going bankrupt", "could it collapse", "is it a trap", "a value trap",
                   "downside risk", "too much debt", "risky",
@@ -110,7 +112,8 @@ KEYWORDS: dict[str, list[str]] = {
     "moat":      ["a moat", "the moat", "competitive advantage", "pricing power",
                   "durable edge", "an edge", "defensible", "wide moat"],
     "compare":   ["compare", " versus ", " vs ", "head to head", "head-to-head",
-                  "better than", "which is better", "stack up against"],
+                  "better than", "which is better", "which is safer", "which is riskier",
+                  "stack up against"],
     "company":   ["tell me about", "walk me through", "give me the full picture",
                   "overview of", "break it down", "deep dive"],
 }
@@ -211,13 +214,53 @@ _PHRASE_INDEX: list[tuple[str, str]] = sorted(
     key=lambda pv: (-len(pv[0]), pv[0], pv[1]),
 )
 
+# Concept education (no company). Wins only when no ticker is extracted.
+_LEARN_PHRASES = (
+    "explain rule of 40", "explain the rule of 40", "what is rule of 40",
+    "what is the rule of 40", "what's the rule of 40", "what is a rule of 40",
+    "define rule of 40", "teach me rule of 40",
+    "explain dcf", "what is dcf", "what is a dcf", "what is discounted cash flow",
+    "explain free cash flow", "what is free cash flow", "what is fcf",
+    "explain magic number", "what is magic number", "what is nrr",
+    "explain nrr", "what is net revenue retention", "explain ev/ebitda",
+    "what is enterprise value", "what is capex intensity", "explain altman",
+    "what is a moat", "explain moat", "what are five forces", "explain five forces",
+)
+
+# Personalized advice / execution — never run company analysis as advice.
+_REFUSE_PHRASES = (
+    "sell everything", "should i sell everything", "should i buy everything",
+    "what should i buy", "what should i sell", "pick stocks for me",
+    "allocate my", "my 401k", "my portfolio", "rebalance my",
+    "place an order", "execute a trade", "place a trade", "buy me some",
+    "how much should i invest", "where should i put my money",
+)
+
+_RISK_MODIFIERS = (
+    "safer", "safer?", "riskier", "more safe", "less risky", "more risky",
+    "which is safer", "which is riskier", "stronger balance sheet",
+    "weaker balance sheet", "more leverage", "less leverage",
+)
+
+_COMPANY_INTENTS = frozenset({
+    "brief", "valuation", "redflags", "health", "company", "framework", "moat", "analyze",
+})
+
+ROUTE_SCHEMA_VERSION = "1.0.0"
+
+# Agent-facing intent taxonomy (analyze maps to company-class; still runnable).
+AGENT_INTENTS = frozenset({
+    "brief", "valuation", "redflags", "health", "company", "compare", "framework",
+    "screen", "learn", "moat", "help", "refuse", "analyze",
+})
+
 
 @dataclass
 class Route:
     text: str
     verb: str                    # always set — DEFAULT_VERB when nothing matched
     matched: list[tuple[str, str]]
-    method: str                  # keyword | verb | default
+    method: str                  # keyword | verb | default | refuse | learn
     framework: str | None = None
 
     @property
@@ -225,32 +268,253 @@ class Route:
         return True
 
 
-def route(text: str, *, apply_default: bool = True) -> Route:
-    """Map natural language to a verb.
+@dataclass
+class RouteResult:
+    """Machine-readable routing for agents (deterministic; no LLM)."""
+    schema_version: str
+    original_query: str
+    intent: str
+    secondary_intents: list[str] = field(default_factory=list)
+    tickers: list[str] = field(default_factory=list)
+    confidence: float = 0.0
+    matched_terms: list[str] = field(default_factory=list)
+    ambiguity_flags: list[str] = field(default_factory=list)
+    needs_clarification: bool = False
+    clarification_question: str | None = None
+    refusal_category: str | None = None
+    allowed_next_actions: list[str] = field(default_factory=list)
+    framework: str | None = None
+    method: str = "default"
 
-    With `apply_default=True` (product path) a no-match lands on **`brief`**
-    (method=`default`). With `apply_default=False` a genuine no-match returns
-    `method="none"` (verb still populated with DEFAULT_VERB so callers never see
-    a dead name) — the escape hatch the CLI/agent uses to detect "nothing matched".
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+def _lower_pad(text: str) -> str:
+    return f" {text.strip().lower()} "
+
+
+def route_request(text: str) -> RouteResult:
+    """Deterministic NL → intent + tickers for agent middleware.
+
+    Never calls an LLM. Original wording is metadata only (stored in original_query).
     """
-    lowered = f" {text.strip().lower()} "
-    matched: list[tuple[str, str]] = []
-    seen: set[str] = set()
-    for phrase, verb in _PHRASE_INDEX:
-        if phrase in lowered and verb not in seen:
-            matched.append((verb, phrase))
-            seen.add(verb)
-    if matched:
-        return Route(text, matched[0][0], matched, "keyword")
+    original = text
+    lowered = _lower_pad(text)
+    tickers = extract_tickers(text)
+    matched_terms: list[str] = []
+    ambiguity: list[str] = []
+    secondary: list[str] = []
+    framework: str | None = None
+    method = "default"
+    intent = DEFAULT_VERB
+    confidence = 0.35
+    refusal_category: str | None = None
 
+    # --- refuse (personal advice / execution) ---
+    for phrase in _REFUSE_PHRASES:
+        if phrase in lowered:
+            matched_terms.append(phrase)
+            return RouteResult(
+                schema_version=ROUTE_SCHEMA_VERSION,
+                original_query=original,
+                intent="refuse",
+                tickers=tickers,
+                confidence=0.95,
+                matched_terms=matched_terms,
+                method="refuse",
+                refusal_category="personalized_investment_advice",
+                allowed_next_actions=[
+                    "refuse_personal_advice",
+                    "offer_company_analysis_if_ticker_named",
+                ],
+            )
+
+    # --- learn (concept only, no ticker) ---
+    if not tickers:
+        for phrase in _LEARN_PHRASES:
+            if phrase in lowered:
+                matched_terms.append(phrase)
+                return RouteResult(
+                    schema_version=ROUTE_SCHEMA_VERSION,
+                    original_query=original,
+                    intent="learn",
+                    confidence=0.92,
+                    matched_terms=matched_terms,
+                    method="learn",
+                    allowed_next_actions=["run_learn", "no_ticker_required"],
+                )
+        # "rule of 40" / r40 alone without ticker → learn (not empty brief)
+        for phrase in ("rule of 40", "rule of forty", "rule40", " r40 "):
+            if phrase in lowered or lowered.strip() in ("r40", "rule40"):
+                matched_terms.append(phrase.strip())
+                return RouteResult(
+                    schema_version=ROUTE_SCHEMA_VERSION,
+                    original_query=original,
+                    intent="learn",
+                    confidence=0.88,
+                    matched_terms=matched_terms,
+                    method="learn",
+                    allowed_next_actions=["run_learn", "no_ticker_required"],
+                )
+
+    # --- keyword index (longest phrase first) ---
+    keyword_hits: list[tuple[str, str]] = []
+    seen_verbs: set[str] = set()
+    for phrase, verb in _PHRASE_INDEX:
+        if phrase in lowered and verb not in seen_verbs:
+            keyword_hits.append((verb, phrase))
+            seen_verbs.add(verb)
+
+    if keyword_hits:
+        intent = keyword_hits[0][0]
+        method = "keyword"
+        confidence = 0.85
+        matched_terms.extend(p for _, p in keyword_hits)
+        # Two tickers + riskier/safer without "compare" still means compare
+        if intent != "compare" and len(tickers) >= 2:
+            for mod in _RISK_MODIFIERS:
+                if mod in lowered:
+                    intent = "compare"
+                    secondary = ["redflags", "health"]
+                    matched_terms.append(mod)
+                    ambiguity.append("safety_requires_redflags_or_health_evidence")
+                    break
+
+        # Secondary intents for compare + risk modifiers
+        if intent == "compare" or any(v == "compare" for v, _ in keyword_hits):
+            intent = "compare"
+            for mod in _RISK_MODIFIERS:
+                if mod in lowered:
+                    if "redflags" not in secondary:
+                        secondary = ["redflags", "health"]
+                    matched_terms.append(mod)
+                    if "safety_requires_redflags_or_health_evidence" not in ambiguity:
+                        ambiguity.append("safety_requires_redflags_or_health_evidence")
+                    break
+            if any(v == "valuation" for v, _ in keyword_hits[1:]):
+                if "valuation" not in secondary:
+                    secondary.append("valuation")
+        elif len(keyword_hits) > 1:
+            for v, _ in keyword_hits[1:]:
+                if v != intent and v not in secondary:
+                    secondary.append(v)
+            if secondary:
+                ambiguity.append("multiple_keyword_intents")
+
+    # --- leading verb / framework token ---
     first = text.strip().split()
-    if first:
+    if first and method == "default":
         res = resolve(first[0])
         if res.method in ("exact", "alias") and res.command is not None:
-            return Route(text, res.command, [(res.command, first[0])], "verb", framework=res.framework)
+            intent = res.command
+            method = "verb" if res.method == "exact" else "alias"
+            confidence = 0.9 if res.method == "exact" else 0.8
+            matched_terms.append(first[0])
+            framework = res.framework
+            if intent == "framework" and framework:
+                matched_terms.append(framework)
 
-    method = "default" if apply_default else "none"
-    return Route(text, DEFAULT_VERB, [], method)
+    # help
+    if text.strip().lower() in ("help", "-h", "--help") or lowered.strip() == "help":
+        intent, method, confidence = "help", "verb", 0.99
+        matched_terms.append("help")
+
+    # Map analyze stays analyze (runnable); agent taxonomy allows it
+    if intent == "risk":  # should not happen — alias maps to redflags
+        intent = "redflags"
+
+    # Company intent without ticker → clarify (except we already handled learn/refuse)
+    needs_clarification = False
+    clarification_question = None
+    if intent in _COMPANY_INTENTS and not tickers:
+        needs_clarification = True
+        clarification_question = (
+            "Which public company ticker should I analyze "
+            "(for example NVDA or BRK.B)?"
+        )
+        ambiguity.append("missing_ticker")
+        confidence = min(confidence, 0.55)
+    if intent == "compare" and len(tickers) < 2:
+        needs_clarification = True
+        clarification_question = (
+            "Which two or more public tickers should I compare?"
+        )
+        ambiguity.append("compare_needs_two_tickers")
+        confidence = min(confidence, 0.55)
+
+    # Default path
+    if method == "default" and intent == DEFAULT_VERB and not keyword_hits:
+        if not tickers and not first:
+            confidence = 0.2
+        elif tickers and not keyword_hits:
+            confidence = 0.5  # bare ticker → brief is intentional
+            method = "default"
+        else:
+            confidence = 0.35
+
+    actions: list[str] = []
+    if intent == "refuse":
+        actions = ["refuse_personal_advice"]
+    elif intent == "learn":
+        actions = ["run_learn"]
+    elif intent == "help":
+        actions = ["show_help"]
+    elif needs_clarification:
+        actions = ["ask_clarification"]
+    else:
+        actions = [f"run_{intent}"]
+        if secondary:
+            actions.append("attach_secondary_intents")
+        actions.append("compose_from_engine_report_only")
+
+    return RouteResult(
+        schema_version=ROUTE_SCHEMA_VERSION,
+        original_query=original,
+        intent=intent,
+        secondary_intents=secondary,
+        tickers=tickers,
+        confidence=confidence,
+        matched_terms=matched_terms,
+        ambiguity_flags=ambiguity,
+        needs_clarification=needs_clarification,
+        clarification_question=clarification_question,
+        refusal_category=refusal_category,
+        allowed_next_actions=actions,
+        framework=framework,
+        method=method,
+    )
+
+
+def route(text: str, *, apply_default: bool = True) -> Route:
+    """Map natural language to a verb (backward-compatible wrapper).
+
+    With `apply_default=True` (product path) a no-match lands on **`brief`**.
+    With `apply_default=False` a genuine no-match returns `method="none"`.
+    """
+    rr = route_request(text)
+    if rr.intent == "refuse":
+        # Compat: callers expecting a verb still see brief, but method marks refuse
+        return Route(text, DEFAULT_VERB, [(t, t) for t in rr.matched_terms], "refuse")
+    if rr.intent == "learn":
+        return Route(text, "learn", [(t, t) for t in rr.matched_terms], "learn")
+    if not apply_default and rr.method == "default" and not rr.matched_terms and not rr.tickers:
+        return Route(text, DEFAULT_VERB, [], "none")
+    # Rebuild matched as (verb, phrase) when possible
+    matched_pairs: list[tuple[str, str]] = []
+    lowered = _lower_pad(text)
+    for phrase, verb in _PHRASE_INDEX:
+        if phrase in lowered:
+            matched_pairs.append((verb, phrase))
+    if not matched_pairs and rr.matched_terms:
+        matched_pairs = [(rr.intent, t) for t in rr.matched_terms]
+    return Route(
+        text,
+        rr.intent if rr.intent != "refuse" else DEFAULT_VERB,
+        matched_pairs,
+        rr.method if rr.method != "default" or apply_default else "none",
+        framework=rr.framework,
+    )
 
 
 # --- Ticker extraction ---------------------------------------------------
@@ -349,6 +613,8 @@ def _load_module(name: str):
         if spec is None or spec.loader is None:
             raise ImportError(f"cannot load {path}")
         mod = importlib.util.module_from_spec(spec)
+        # Force skill-path imports (not a stale site-packages finance_skills).
+        mod.__package__ = None
         sys.modules[unique] = mod
         spec.loader.exec_module(mod)
         return mod
@@ -392,11 +658,22 @@ def main(argv: list[str]) -> int:
         return 0 if tickers else 1
 
     if head == "route":
-        r = route(" ".join(argv[1:]))
+        rest = argv[1:]
+        as_json = "--json" in rest
+        query = " ".join(a for a in rest if a != "--json")
+        if as_json:
+            print(json.dumps(route_request(query).to_dict(), indent=2))
+            return 0
+        r = route(query)
+        rr = route_request(query)
+        if rr.intent == "refuse":
+            print(f"refuse  [refuse]  category={rr.refusal_category}")
+            return 0
         extra = f"  framework={r.framework}" if r.framework else ""
         others = ", ".join(v for v, _ in r.matched[1:])
         also = f"  (also matched: {others})" if others else ""
-        print(f"{r.verb}  [{r.method}]{extra}{also}")
+        sec = f"  secondary={rr.secondary_intents}" if rr.secondary_intents else ""
+        print(f"{rr.intent}  [{rr.method}]{extra}{sec}{also}")
         return 0
 
     # Dispatch: known verb / framework token / alias → module.main
