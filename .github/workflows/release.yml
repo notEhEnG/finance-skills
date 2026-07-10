@@ -47,4 +47,11 @@ jobs:
       # Pinned to a full commit SHA (v1.14.0) rather than a floating tag, so a
       # compromised or re-pointed tag can't alter the publish step. Dependabot
       # (github-actions) proposes SHA bumps.
+      #
+      # Requires a Trusted Publisher on PyPI (project → Settings → Publishing):
+      #   owner=notEhEnG, repo=finance-skills, workflow=release.yml, environment=pypi.
+      # skip-existing makes a re-run (or an already-published version) a no-op
+      # instead of a hard 400 "file already exists".
       - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+        with:
+          skip-existing: true
