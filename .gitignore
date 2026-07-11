@@ -35,3 +35,18 @@ docs/_lottie_render/package-lock.json
 # Agent skill-install copies
 .antigravity/
 .claude/skills/
+.codex/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Node (demo render tooling)
+node_modules/
+
+# Local env files
+.env
+.env.*
