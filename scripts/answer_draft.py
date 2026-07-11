@@ -25,7 +25,9 @@ NIA = (
 )
 
 _AGENT_INSTRUCTIONS = [
-    "Send answer_draft to the user as the primary reply (light prose polish OK).",
+    "answer_draft is your evidence floor: keep its material facts and limits, "
+    "but write your own analyst synthesis on top (weigh tensions, build the "
+    "conditional thesis per SKILL.md section 4a).",
     "Do NOT invent numbers or fill missing metrics from memory.",
     "Do NOT add buy/sell/hold recommendations or personal portfolio advice.",
     "Do NOT dump raw JSON unless the user asks for debug output.",
@@ -367,7 +369,7 @@ def _pack(
         "user_visible": True,
         # Signal: agents should stop scripting and respond
         "stop_tool_loop": True,
-        "next_action": "respond_with_answer_draft",
+        "next_action": "respond_with_synthesis",
     }
     if report is not None:
         out["has_engine_report"] = "engine_report" in report or "schema_version" in report

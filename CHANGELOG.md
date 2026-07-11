@@ -6,6 +6,31 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-12
+
+### Changed
+- **Agent contract: fact layer → analyst layer.** `answer_draft` is now the
+  *evidence floor*, not the final reply: agents must write their own synthesis on
+  top of the report (weigh conflicting signals, connect flags to consequences,
+  state what would change the picture), with all numbers still traceable to the
+  engine report. `SKILL.md` §0 rewritten; new §4a **conditional-thesis** shape for
+  "is X a buy?" questions (setup → bull case → bear case → conditional screen →
+  what to watch → boundary), including the ticker-swap self-check.
+- **`next_action` renamed** `respond_with_answer_draft` → `respond_with_synthesis`;
+  `agent_instructions` first entry now mandates analyst synthesis instead of
+  paste-with-polish. Guardrails unchanged (no invented numbers, no unconditional
+  buy/sell/hold, fixture/disabled disclosures must survive).
+- `docs/agent-policy.md` success/failure criteria updated: pasting `answer_draft`
+  verbatim is now an explicit failure mode ("courier behavior, not analysis").
+- README: new positioning — deterministic engine for numbers, the agent
+  (Claude Code / Codex / Antigravity) for the argument.
+
+### Fixed
+- **`install.sh` no longer recursively copies prior installs.** Skill-install
+  directories (`.claude`, `.antigravity`, `.codex`) and build artifacts (`dist`,
+  `build`, `*.egg-info`, venvs) are excluded from the copied skill payload; a
+  stale install could previously nest a full repo copy inside itself.
+
 ## [0.8.1] - 2026-07-11
 
 ### Fixed

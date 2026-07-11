@@ -21,7 +21,7 @@ class TestAskFixture(unittest.TestCase):
         self.assertEqual(out["intent"], "valuation")
         self.assertEqual(out["tickers"], ["NBIS"])
         self.assertTrue(out["stop_tool_loop"])
-        self.assertEqual(out["next_action"], "respond_with_answer_draft")
+        self.assertEqual(out["next_action"], "respond_with_synthesis")
         draft = out["answer_draft"]
         self.assertIn("Sample/fixture", draft)
         self.assertIn("DCF", draft)

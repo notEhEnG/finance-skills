@@ -3,18 +3,21 @@
 Executable companion to [`SKILL.md`](../SKILL.md). Agents must follow this when
 composing user-visible answers after routing / engine runs.
 
-## Preferred path: `ask` → send `answer_draft`
+## Preferred path: `ask` → synthesize on top of `answer_draft`
 
 ```bash
 python3 scripts/ask.py --json "<user question>"   # add --fixture for sample data
 ```
 
-The JSON includes **`answer_draft`** (user-facing), **`stop_tool_loop`: true**, and
-**`next_action`: `respond_with_answer_draft`**.
+The JSON includes **`answer_draft`** (the evidence floor), **`stop_tool_loop`: true**,
+and **`next_action`: `respond_with_synthesis`**.
 
-**Success looks like:** one tool call → paste/polish `answer_draft` → stop.  
-**Failure looks like:** five script calls, raw JSON dump, or only “not investment advice”
-with no valuation/risk content.
+**Success looks like:** one tool call → an original analyst answer where every
+number traces to the report, the tensions in the data are weighed, and the user's
+actual question is answered in conditional form (SKILL.md §4a).  
+**Failure looks like:** (a) five script calls or a raw JSON dump, **(b) pasting
+`answer_draft` verbatim — that is courier behavior, not analysis,** or (c) numbers
+that don't exist in the report.
 
 ## Hard gate
 
@@ -61,8 +64,10 @@ valuation slice. Lead with fixture/disabled if present.
 
 ### `valuation`
 
-Frame “is it cheap / a buy?” as: available multiples + DCF **if enabled** + what
-cannot be concluded. Never recommend purchase.
+Frame “is it cheap / a buy?” as a **conditional thesis** (SKILL.md §4a): setup,
+bull case the numbers support, bear case the numbers support, conditional screen
+(available multiples + DCF **if enabled**), what to watch, and what cannot be
+concluded. Never recommend purchase.
 
 ### `redflags` / `health`
 

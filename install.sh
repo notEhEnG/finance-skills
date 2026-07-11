@@ -43,10 +43,15 @@ copy_into() {
     rsync -a \
       --exclude '.git' --exclude '.cache' --exclude '__pycache__' --exclude '*.pyc' \
       --exclude '.pytest_cache' --exclude 'overview*.md' --exclude '*-cli.txt' --exclude 'Gap-*.csv' \
+      --exclude '.claude' --exclude '.antigravity' --exclude '.codex' \
+      --exclude 'dist' --exclude 'build' --exclude '*.egg-info' --exclude '.venv' --exclude 'venv' \
       "$SRC"/ "$dest"/
   else
     cp -R "$SRC"/. "$dest"/
-    rm -rf "$dest/.git" "$dest/.cache" "$dest/.pytest_cache"
+    rm -rf "$dest/.git" "$dest/.cache" "$dest/.pytest_cache" \
+      "$dest/.claude" "$dest/.antigravity" "$dest/.codex" \
+      "$dest/dist" "$dest/build" "$dest/.venv" "$dest/venv"
+    rm -rf "$dest"/*.egg-info
     rm -f "$dest"/overview*.md "$dest"/*-cli.txt "$dest"/Gap-*.csv
     find "$dest" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
     find "$dest" -name '*.pyc' -delete 2>/dev/null || true
@@ -83,11 +88,11 @@ cat <<'EOF'
 Done. If needed: pip install yfinance
   (optional CLI) pip install -U finance-skills   # keep in sync with skill scripts
 
-Preferred agent command (one shot → answer_draft):
+Preferred agent command (one shot → report + evidence floor, then agent synthesis):
   python3 scripts/ask.py --json "is NBIS a buy?"
   python3 scripts/ask.py "is CRWV a buy?" --fixture
 
-Slash (agent should run ask, then send answer_draft to the user):
+Slash (agent runs ask, then writes its analyst answer on the report's numbers):
   /finance-skills is NBIS a buy?
   /finance-skills is NVDA overvalued?
   /finance-skills compare AMD and NVDA

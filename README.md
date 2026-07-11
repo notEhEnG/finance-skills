@@ -9,6 +9,8 @@
 
 When an agent talks about a public company, it can invent plausible EV/EBITDA, fill missing net debt with zero, or say “buy.” This skill forces a **deterministic** path: route → engine report → bounded answer. Numbers come only from the report; missing data is **disabled**, not guessed.
 
+**Why an agent skill instead of a stock API or a chatbot?** A raw LLM hallucinates numbers. A data API can’t reason. finance-skills splits the job: a deterministic engine computes every number and flag (auditable, testable, evaluated in [`docs/eval.md`](docs/eval.md)), and your agent — Claude Code, Codex, Antigravity — does what agents are actually good at: weighing conflicting evidence and building the argument. Same question, two tickers, two genuinely different analyses — with zero invented numbers.
+
 ```text
 # 1) Install skill (Claude Code)
 curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/main/install.sh | bash -s -- claude
@@ -43,7 +45,9 @@ curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/main/instal
 2. **Agent runs one command:**  
    `python3 scripts/ask.py --json "Is CRWV a buy?"` (add `--fixture` for sample data)  
 3. **Engine returns** `answer_draft` + full `report` (disabled DCF, fixture flag, evidence)  
-4. **Agent sends `answer_draft` to the user** and **stops scripting** (`stop_tool_loop`)  
+4. **Agent writes its own analyst answer on top** — weighing the bull/bear tensions in
+   the report, in the conditional-thesis shape (SKILL.md §4a) — then **stops scripting**
+   (`stop_tool_loop`). `answer_draft` is the evidence floor, not the final reply.  
 5. No buy/sell recommendation; numbers only from the draft/report  
 
 **Hard gate:** if `ask` (or legacy `route --json` + engine `--json`) did not run this turn for an in-scope company question, **do not state financial numbers.**
