@@ -48,7 +48,9 @@ buy, sell, hold, guaranteed, safe (as verdict), undervalued, overvalued
 [PARA 1 — 3–6 sentences] Lead with material limits (fixture / disabled / missing).
 Bounded interpretation only from report fields.
 
-[EVIDENCE] Bullet or short list: metric = value (from report only).
+[EVIDENCE] `Metric | Value | Read` markdown table (from report only) — keep the
+draft's table; flags may follow as bullets. Compare answers keep the
+side-by-side per-ticker table.
 
 [LIMITS] Disabled analyses + missing inputs + unlocks.
 

@@ -164,6 +164,12 @@ and never answer with only a metric list. Use the **conditional thesis** shape:
 5. **What to watch** — the 2–3 report metrics that decide which case wins.
 6. **Boundary** — one line: read-only analysis, not investment advice.
 
+**Formatting rule — numbers live in tables, argument lives in prose.** The draft's
+evidence arrives as a `Metric | Value | Read` markdown table: **keep it** (or an
+equivalent table) in your reply so the numbers scan in two seconds; weave the
+thesis around it, don't dissolve the table into paragraphs. Comparisons
+(`compare`, "X vs Y") must always keep the side-by-side per-ticker table.
+
 The engine provides every number in steps 1–5. **You provide the argument.**
 Two different tickers must never produce structurally interchangeable answers —
 if swapping the ticker name would leave your answer plausible, you have not

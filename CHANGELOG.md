@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **Evidence renders as a table.** Single-ticker draft evidence is now a
+  `Metric | Value | Read` markdown table (flags stay as bullets beneath) —
+  numbers scan in two seconds instead of hiding in bullet prose. The evidence
+  block is joined with single newlines so tables survive the draft's
+  blank-line paragraph join. SKILL.md §4a and agent-policy gain the formatting
+  rule: **numbers live in tables, argument lives in prose** — the agent must
+  keep the table in its synthesis, and compare answers must keep the
+  side-by-side per-ticker table.
+
 ## [0.10.0] - 2026-07-12
 
 ### Added

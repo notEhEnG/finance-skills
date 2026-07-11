@@ -135,12 +135,22 @@ def _compare_table_block(report: dict[str, Any]) -> list[str]:
     return lines
 
 
-def _evidence_lines(report: dict[str, Any], intent: str) -> list[str]:
-    lines: list[str] = []
+def _table_from_cells(cells: list[tuple[str, str, str]]) -> list[str]:
+    """Render (metric, value, read) triples as a scannable markdown table."""
+    if not cells:
+        return []
+    lines = ["| Metric | Value | Read |", "| --- | --- | --- |"]
+    for m, v, rd in cells:
+        lines.append(f"| **{m}** | {v} | {rd or '—'} |")
+    return lines
 
+
+def _evidence_lines(report: dict[str, Any], intent: str) -> list[str]:
     # Compare: full markdown table (not dict dumps)
     if intent == "compare" and (report.get("markdown_table") or report.get("tickers")):
         return _compare_table_block(report)
+
+    cells: list[tuple[str, str, str]] = []
 
     # Valuation / health style rows
     for row in report.get("rows") or []:
@@ -151,45 +161,48 @@ def _evidence_lines(report: dict[str, Any], intent: str) -> list[str]:
             continue
         m, v, rd = row.get("metric"), row.get("value"), row.get("read")
         if m and v is not None:
-            bit = f"- **{m}:** {v}"
-            if rd and rd != "—":
-                bit += f" — {rd}"
-            lines.append(bit)
-        if len(lines) >= 6:
+            cells.append((str(m), str(v), str(rd) if rd else "—"))
+        if len(cells) >= 6:
             break
 
     # Brief-style structured fields
-    if not lines:
+    if not cells:
         rule = report.get("rule40") or {}
         if rule.get("preferred_score") is not None:
             bar = rule.get("benchmark")
-            passes = rule.get("passes")
-            tag = "PASS" if passes else "BELOW BAR"
-            lines.append(
-                f"- **Rule of 40:** preferred {rule['preferred_score']:.0f} "
-                f"vs bar {bar} → {tag}"
+            tag = "PASS" if rule.get("passes") else "BELOW BAR"
+            cells.append(
+                ("Rule of 40", f"preferred {rule['preferred_score']:.0f}", f"vs bar {bar} → {tag}")
             )
         val = report.get("valuation") or {}
         if val.get("ev_sales") is not None:
-            lines.append(f"- **EV/Sales:** {_fmt_mult(val['ev_sales'])}")
+            cells.append(("EV/Sales", _fmt_mult(val["ev_sales"]) or "—", "—"))
         if val.get("ev_ebitda") is not None:
-            lines.append(f"- **EV/EBITDA:** {_fmt_mult(val['ev_ebitda'])}")
+            cells.append(("EV/EBITDA", _fmt_mult(val["ev_ebitda"]) or "—", "—"))
         if val.get("dcf_per_share") is not None:
-            lines.append(f"- **DCF/share (heuristic):** {val['dcf_per_share']}")
+            cells.append(("DCF/share", str(val["dcf_per_share"]), "heuristic"))
         elif val.get("dcf_note"):
-            lines.append(f"- **DCF:** {val['dcf_note']}")
+            cells.append(("DCF", "n/a", str(val["dcf_note"])))
         sol = report.get("solvency") or {}
         if sol.get("revenue_growth_pct") is not None:
-            lines.append(f"- **Revenue growth:** {_fmt_pct(sol['revenue_growth_pct'])}")
+            cells.append(("Revenue growth", _fmt_pct(sol["revenue_growth_pct"]) or "—", "—"))
         if sol.get("fcf_margin_pct") is not None:
-            lines.append(f"- **FCF margin:** {_fmt_pct(sol['fcf_margin_pct'])}")
+            cells.append(("FCF margin", _fmt_pct(sol["fcf_margin_pct"]) or "—", "—"))
 
+    lines = _table_from_cells(cells)
+
+    # Flags are prose-shaped: keep as bullets beneath the table
+    flag_lines = []
     for fl in _flags(report):
         name = fl.get("flag") or fl.get("name") or "flag"
         detail = fl.get("detail") or ""
-        lines.append(f"- **Flag — {name}:** {detail}")
+        flag_lines.append(f"- **Flag — {name}:** {detail}")
+    if flag_lines:
+        if lines:
+            lines.append("")
+        lines.extend(flag_lines)
 
-    return lines[:12]
+    return lines[:20]
 
 
 def _headline(report: dict[str, Any] | None, intent: str, tickers: list[str]) -> str:
@@ -307,7 +320,9 @@ def draft_from_report(
             parts.append("**Comparison table** (🏆 leader · ⚠️ worst on burn/leverage)")
         else:
             parts.append("**Evidence (engine only)**")
-        parts.extend(evidence)
+        # Single-newline join: table rows / bullets must stay adjacent lines,
+        # or the markdown table breaks when parts are joined with blank lines.
+        parts.append("\n".join(evidence))
 
     # Secondary risk note for compare+safer style
     if secondary_intents:
