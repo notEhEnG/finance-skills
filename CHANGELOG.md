@@ -6,6 +6,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-11
+
+### Fixed
+- **`ask` no longer masks errors.** The `--explain` builder call now feature-detects
+  a `flags` kwarg instead of a catch-and-retry `except TypeError`, so a genuine
+  `TypeError` inside a builder surfaces instead of being silently swallowed.
+- **`ask` unexpected exceptions are debuggable.** The catch-all now prints a
+  traceback to stderr and tags the draft with the exception type, so a code bug is
+  distinguishable from a legitimate "data unavailable".
+- **`doctor` import guarded.** `load_fixture` now uses the `finance_skills.data` /
+  `data` `__package__` guard like the rest of the module, instead of relying on
+  sibling-module `sys.path` pollution when installed.
+
 ## [0.8.0] - 2026-07-11
 
 ### Added
@@ -160,7 +173,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Verb-first CLI over the shared engine; segment-aware Rule of 40; DCF; EV/EBITDA;
   fail-closed net-debt handling; offline fixtures and tests. See the git history.
 
-[Unreleased]: https://github.com/notEhEnG/finance-skills/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/notEhEnG/finance-skills/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/notEhEnG/finance-skills/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/notEhEnG/finance-skills/compare/v0.7.0...v0.8.0
 [0.4.0]: https://github.com/notEhEnG/finance-skills/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/notEhEnG/finance-skills/releases/tag/v0.3.0

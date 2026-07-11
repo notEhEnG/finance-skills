@@ -7,8 +7,10 @@ ready-to-send `answer_draft` so the skill actually answers the user.
 
 from __future__ import annotations
 
+import inspect
 import json
 import sys
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -34,16 +36,26 @@ def _load_builder(command: str):
     return router.load_builder(command)
 
 
+def _accepts_flags(build) -> bool:
+    """True if a builder takes a `flags` keyword (brief, valuation)."""
+    try:
+        return "flags" in inspect.signature(build).parameters
+    except (TypeError, ValueError):
+        return False
+
+
 def _run_single(intent: str, ticker: str, *, use_fixture: bool) -> dict[str, Any]:
     f = load_for_cli(ticker, use_fixture=use_fixture)
     if intent == "moat":
         # Numbers from brief; qualitative lens note added in draft path
         intent = "brief"
     build = _load_builder(intent if intent in router.BUILDERS else "brief")
-    # Builders that accept flags: brief, valuation
-    try:
+    # Only pass --explain to builders that actually accept a `flags` kwarg
+    # (brief, valuation). Feature-detect rather than catch-and-retry, so a real
+    # TypeError raised *inside* a builder isn't silently swallowed.
+    if _accepts_flags(build):
         report = build(f, True, flags={"--explain"})
-    except TypeError:
+    else:
         report = build(f, True)
     if isinstance(report, dict):
         return report
@@ -203,8 +215,12 @@ def run_ask(query: str, *, use_fixture: bool = False) -> dict[str, Any]:
                 )
                 return {**base, **draft, "report": None}
 
-    except Exception as exc:  # noqa: BLE001 — surface as draft, don't crash agent
-        draft = answer_draft.draft_error(str(exc), intent=intent, tickers=tickers)
+    except Exception as exc:  # noqa: BLE001 — never crash the agent…
+        # …but make an unexpected code error debuggable: print the traceback to
+        # stderr and tag the draft with the exception type, so a KeyError/bug is
+        # distinguishable from a legitimate "data unavailable".
+        traceback.print_exc(file=sys.stderr)
+        draft = answer_draft.draft_error(f"{type(exc).__name__}: {exc}", intent=intent, tickers=tickers)
         return {**base, **draft, "report": None}
 
     if not report:
@@ -282,8 +298,12 @@ def doctor() -> dict[str, Any]:
     fix_dir = scripts_dir.parent / "fixtures"
     if not fix_dir.is_dir():
         fix_dir = scripts_dir / "fixtures"
-    # fixtures live next to package data
-    from data import load_fixture
+    # fixtures live next to package data (guarded like the module's top imports,
+    # so this doesn't rely on sibling modules polluting sys.path when installed)
+    if __package__:
+        from finance_skills.data import load_fixture
+    else:
+        from data import load_fixture
 
     for t in ("CRWV", "NBIS"):
         try:
