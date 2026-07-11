@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-12
+
 ### Added
 - **Synthesis eval tier.** `agent_eval.synthesis_checks` scores the analyst-layer
   contract: `courier_verbatim_draft` (reply is `answer_draft` pasted, similarity
