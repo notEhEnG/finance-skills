@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-11
+
+### Added
+- **Scannable table + emoji output** for multi-ticker views: `compare` and
+  `watchlist run compare|rank` render a bold **Metric** header with 🏆 per-row
+  leaders; `screen` highlights per-field leaders — faster to eyeball the contrast.
+
+### Fixed
+- Lint/type hygiene: drop an unnecessary list comprehension (`screen`) and unused
+  `type: ignore` comments (`ask`); ignore the `.antigravity/` skill-install copy.
+
 ## [0.7.0] - 2026-07-11
 
 ### Added
@@ -149,7 +160,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Verb-first CLI over the shared engine; segment-aware Rule of 40; DCF; EV/EBITDA;
   fail-closed net-debt handling; offline fixtures and tests. See the git history.
 
-[Unreleased]: https://github.com/notEhEnG/finance-skills/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/notEhEnG/finance-skills/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/notEhEnG/finance-skills/compare/v0.7.0...v0.8.0
 [0.4.0]: https://github.com/notEhEnG/finance-skills/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/notEhEnG/finance-skills/releases/tag/v0.3.0
 [0.2.1]: https://github.com/notEhEnG/finance-skills/releases/tag/v0.2.1

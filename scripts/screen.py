@@ -238,7 +238,7 @@ def _markdown_screen_table(
     fields: list[str],
 ) -> str:
     leaders = _leaders_by_field(results, fields)
-    headers = ["Ticker", "Result", *[f for f in fields]]
+    headers = ["Ticker", "Result", *list(fields)]
     rows: list[list[str]] = []
     for r in results:
         t = r["ticker"]

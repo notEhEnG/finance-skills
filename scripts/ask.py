@@ -256,7 +256,7 @@ def doctor() -> dict[str, Any]:
                 info["colocal_version_file"] = line.split("=", 1)[1].strip().strip("\"'")
                 break
     try:
-        import finance_skills as fs  # type: ignore
+        import finance_skills as fs
 
         info["importable_finance_skills"] = getattr(fs, "__file__", None)
         info["importable_version"] = getattr(fs, "__version__", None)
@@ -283,7 +283,7 @@ def doctor() -> dict[str, Any]:
     if not fix_dir.is_dir():
         fix_dir = scripts_dir / "fixtures"
     # fixtures live next to package data
-    from data import load_fixture  # type: ignore
+    from data import load_fixture
 
     for t in ("CRWV", "NBIS"):
         try:

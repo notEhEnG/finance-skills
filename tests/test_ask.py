@@ -10,8 +10,8 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import agent_eval
-import ask
 import answer_draft
+import ask
 
 
 class TestAskFixture(unittest.TestCase):
