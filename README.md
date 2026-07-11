@@ -39,6 +39,25 @@ curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/main/instal
 
 ---
 
+## How this differs from other finance skills
+
+Most agent finance skills on GitHub fall into three classes — each fails a different way:
+
+| Class | Where numbers come from | The problem | This skill |
+|-------|------------------------|-------------|------------|
+| **Prompt-only** ("no runtime, every skill is a prompt") | The model *reasons about* a DCF or F-Score from memory | Hallucinated numbers with confident formatting | The engine **computes** every metric; the model may not state a number that isn't in the report |
+| **Web-search analysts** | Search results pasted into the context | Unverifiable figures + explicit "Buy/Hold/Sell + target price" output | Fail-closed evidence policy; **never** a recommendation — a conditional valuation screen instead |
+| **API wrappers** | A paid data vendor behind an API key | Data delivery without an analysis contract; vendor lock-in | Free data layer + an explicit **agent contract**: the engine keeps the agent honest, the agent builds the argument |
+
+The split that makes this work: a **deterministic fact layer** (auditable numbers,
+flags, disabled analyses — tested in CI) and a **mandated analyst layer** (the
+agent must weigh the bull/bear tension and answer the actual question, scored by
+a public three-tier eval: *safe → useful → synthesized*, including a ticker-swap
+check). Prompt-only skills have the second layer without the first; API wrappers
+have the first without the second.
+
+---
+
 ## Agent interaction (contract)
 
 1. **User:** “Is CRWV a buy?”  

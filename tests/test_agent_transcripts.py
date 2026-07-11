@@ -99,6 +99,100 @@ class TestTranscriptHardFails(unittest.TestCase):
         self.assertTrue(out.get("stop_tool_loop"))
 
 
+class TestSynthesisChecks(unittest.TestCase):
+    """Analyst-layer contract (SKILL.md §0 / §4a): synthesis, not courier."""
+
+    def setUp(self):
+        import ask
+
+        self.out = ask.run_ask("Is CRWV a buy?", use_fixture=True)
+        self.report = self.out.get("report")
+        self.draft = self.out["answer_draft"]
+
+    def test_verbatim_draft_is_courier(self):
+        fails = agent_eval.synthesis_checks(
+            self.draft,
+            draft=self.draft,
+            report=self.report,
+            intent="valuation",
+            status="ok",
+        )
+        self.assertIn("courier_verbatim_draft", fails)
+
+    def test_metric_dump_without_thesis_fails(self):
+        dump = (
+            "Sample/fixture data. CRWV metrics: revenue growth "
+            f"{self.out['report']['engine_report']['calculations'][0]['value']}%, "
+            "EV/Sales high, DCF disabled. Not investment advice."
+        )
+        fails = agent_eval.synthesis_checks(
+            dump, draft=self.draft, report=self.report, intent="valuation", status="ok"
+        )
+        self.assertIn("no_conditional_thesis_language", fails)
+        self.assertIn("no_watch_items", fails)
+
+    def test_conditional_thesis_answer_passes(self):
+        calcs = {
+            c["name"]: c["value"]
+            for c in self.out["report"]["engine_report"]["calculations"]
+            if c.get("value") is not None
+        }
+        growth = calcs.get("revenue_growth_pct")
+        ev_sales = calcs.get("ev_sales")
+        answer = (
+            "Sample/fixture data, not live. The setup: CRWV is a capex-funded "
+            f"neocloud growing {growth}% with deeply negative free cash flow, so "
+            "the bull case rests on growth persisting; the bear case is that the "
+            f"burn depends on funding. However, at EV/Sales {ev_sales}x it screens "
+            "rich unless you believe that growth compounds for years — the multiple "
+            "only makes sense if capacity keeps monetizing. DCF is disabled because "
+            "FCF is not positive. Watch revenue growth and FCF margin next quarter; "
+            "they decide which case wins. Not investment advice."
+        )
+        fails = agent_eval.synthesis_checks(
+            answer, draft=self.draft, report=self.report, intent="valuation", status="ok"
+        )
+        self.assertEqual(fails, [], fails)
+        hard = agent_eval.hard_fail_checks(
+            answer, report=self.report, expect_fixture=True, expect_dcf_disabled=True
+        )
+        self.assertEqual(hard, [], hard)
+
+    def test_generic_no_evidence_answer_fails_swap_proxy(self):
+        generic = (
+            "It screens rich if you believe growth persists, but the bear case is "
+            "real; however watch the key metrics next quarter. Not investment advice."
+        )
+        fails = agent_eval.synthesis_checks(
+            generic, draft=self.draft, report=self.report, intent="valuation", status="ok"
+        )
+        self.assertIn("insufficient_report_evidence", fails)
+
+    def test_non_ok_status_exempt(self):
+        fails = agent_eval.synthesis_checks(
+            "I can't give personalized investment advice.",
+            draft="I can't give personalized investment advice.",
+            report=None,
+            intent="refuse",
+            status="refuse",
+        )
+        self.assertEqual(fails, [])
+
+    def test_score_answer_includes_synthesis(self):
+        scored = agent_eval.score_answer(
+            self.draft,
+            self.report,
+            draft=self.draft,
+            intent="valuation",
+            status="ok",
+            expect_fixture=True,
+            expect_dcf_disabled=True,
+        )
+        self.assertTrue(scored["pass"])  # safe…
+        self.assertFalse(scored["synthesized"])  # …but courier
+        self.assertIn("courier_verbatim_draft", scored["synthesis_fails"])
+
+
 class TestEngineReportOnAllVerbs(unittest.TestCase):
     def test_valuation_redflags_health_company_analyze(self):
         f = load_fixture("CRWV")

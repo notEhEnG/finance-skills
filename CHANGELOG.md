@@ -6,6 +6,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Synthesis eval tier.** `agent_eval.synthesis_checks` scores the analyst-layer
+  contract: `courier_verbatim_draft` (reply is `answer_draft` pasted, similarity
+  ≥ 0.90), missing conditional-thesis / weighed-tension / watch-item language
+  (§4a structure), and `insufficient_report_evidence` — the automated
+  **ticker-swap proxy** (< 2 report-specific figures = generic answer).
+  `score_answer` now grades three axes: safe → useful → synthesized.
+  `docs/eval.md` documents the tier plus the manual ticker-swap protocol and a
+  per-agent publishing table.
+- **README: competitor-class comparison** — prompt-only skills, web-search
+  analysts, and API wrappers vs. this skill's fact-layer + analyst-layer split.
+
+### Fixed
+- `agent_eval.score_answer` no longer forwards `intent`/`status` kwargs into
+  `hard_fail_checks` (previously a latent `TypeError` for any caller passing
+  them).
+
 ## [0.9.0] - 2026-07-12
 
 ### Changed

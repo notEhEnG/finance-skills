@@ -5,10 +5,15 @@ An agent answer FAILS if it:
 - issues buy/sell/hold recommendations
 - hides a disabled DCF when the report disabled it
 - presents fixture data as live without disclosure
+
+Beyond hard fails, `synthesis_checks` scores the SKILL.md §0/§4a analyst-layer
+contract: the reply must be the agent's own synthesis on top of the report —
+not `answer_draft` pasted verbatim (courier behavior) and not a bare metric dump.
 """
 
 from __future__ import annotations
 
+import difflib
 import re
 from typing import Any
 
@@ -207,14 +212,115 @@ def usefulness_checks(
     return fails
 
 
+_ANALYSIS_INTENTS = (
+    "valuation",
+    "brief",
+    "redflags",
+    "health",
+    "company",
+    "compare",
+    "framework",
+    "analyze",
+)
+
+# §4a conditional-thesis markers: the screen must be stated conditionally, the
+# tensions weighed, and forward "what to watch" items named.
+_CONDITIONAL = re.compile(
+    r"\b(if you believe|only makes sense if|unless|as long as|depends on|"
+    r"screens (rich|cheap|expensive)|on (available|reported|these) "
+    r"(multiples|assumptions|inputs))\b",
+    re.I,
+)
+_TENSION = re.compile(
+    r"\b(but|however|tension|whereas|on the other hand|cuts both ways|"
+    r"offset|the (bull|bear) case|would hurt|counter)\b",
+    re.I,
+)
+_WATCH = re.compile(
+    r"\b(watch|monitor|track|next quarter|decides which|key signal)\b",
+    re.I,
+)
+
+
+def _normalize_for_similarity(text: str) -> str:
+    # Strip markdown decoration and whitespace so verbatim-with-bolding still matches
+    t = re.sub(r"[*_#`>\-|]", " ", text.lower())
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def synthesis_checks(
+    answer: str,
+    *,
+    draft: str | None = None,
+    report: dict[str, Any] | None = None,
+    intent: str | None = None,
+    status: str | None = None,
+) -> list[str]:
+    """Score the analyst-layer contract (SKILL.md §0 / §4a). Empty list = pass.
+
+    Only applies to `ok`-status company-analysis intents; refusals, lessons,
+    clarifications, and errors are exempt — those SHOULD track the draft closely.
+    """
+    if status not in (None, "ok"):
+        return []
+    if intent is not None and intent not in _ANALYSIS_INTENTS:
+        return []
+
+    fails: list[str] = []
+    text = (answer or "").strip()
+    if not text:
+        return ["empty_answer"]
+    low = text.lower()
+
+    # Courier behavior: the reply is answer_draft pasted (near-)verbatim.
+    if draft:
+        ratio = difflib.SequenceMatcher(
+            None,
+            _normalize_for_similarity(text),
+            _normalize_for_similarity(draft),
+        ).ratio()
+        if ratio >= 0.90:
+            fails.append("courier_verbatim_draft")
+
+    # §4a structure: conditional screen, weighed tension, forward watch items.
+    if not _CONDITIONAL.search(low):
+        fails.append("no_conditional_thesis_language")
+    if not _TENSION.search(low):
+        fails.append("no_weighed_tension")
+    if not _WATCH.search(low):
+        fails.append("no_watch_items")
+
+    # Evidence density: the argument must actually use the report's numbers.
+    # (Ticker-swap proxy: an answer with <2 report-specific figures is generic.)
+    if report is not None:
+        allowed = _report_number_whitelist(report)
+        used = 0
+        for tok in set(_numbers_in_text(text)):
+            raw = tok.rstrip("%")
+            if raw in ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "10", "40", "100"):
+                continue
+            if raw in allowed:
+                used += 1
+        if used < 2:
+            fails.append("insufficient_report_evidence")
+
+    return fails
+
+
 def score_answer(answer: str, report: dict[str, Any] | None, **kwargs) -> dict[str, Any]:
+    draft = kwargs.pop("draft", None)
+    intent = kwargs.pop("intent", None)
+    status = kwargs.pop("status", None)
     fails = hard_fail_checks(answer, report=report, **kwargs)
-    intent = kwargs.get("intent")
-    status = kwargs.get("status")
     useful = usefulness_checks(answer, intent=intent, status=status)
+    synthesis = synthesis_checks(
+        answer, draft=draft, report=report, intent=intent, status=status
+    )
     return {
         "pass": not fails,
         "hard_fails": fails,
         "usefulness_fails": useful,
         "useful": not useful,
+        "synthesis_fails": synthesis,
+        "synthesized": not synthesis,
     }
