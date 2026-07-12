@@ -6,23 +6,40 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-12
+
 ### Added
-- **VHS demo pipeline.** `docs/demo.tape` renders `docs/demo.gif` from real
-  engine output (fixtures, no network) via [charmbracelet/vhs] — three scenes:
-  "is NBIS a buy?" (table + disabled DCF + flags), CRWV-vs-NBIS comparison
-  (🏆 side-by-side), and a refused personal-advice request. A `demo.yml`
-  workflow re-renders on tape/renderer changes so the README demo can never
-  drift from the code. Replaces the hand-built Lottie pipeline
-  (`docs/_lottie_render/`, `demo.lottie.json`), which drifted every release.
+- **VHS demo pipeline, agent-framed and live.** `docs/demo.tape` renders
+  `docs/demo.gif` via [charmbracelet/vhs] as three agent sessions —
+  `[Claude Code] ❯ Is NBIS a buy?`, `[Codex] ❯ compare AMD and NVDA`,
+  `[Antigravity] ❯ should I sell everything…` (refused) — against **live**
+  yfinance data, with the python plumbing hidden (a concealed
+  `command_not_found_handle` routes the typed question into `ask.py`). A
+  `demo.yml` workflow warms the data cache and re-renders on tape/renderer
+  changes so the README demo can never drift from the code. Replaces the
+  hand-built Lottie pipeline (`docs/_lottie_render/`, `demo.lottie.json`).
+- **Contract↔eval pinning tests.** Synthetic §4a- and §4b-shaped answers are
+  fed through `synthesis_checks` and must score clean, so SKILL.md phrasing
+  and the eval regexes can no longer drift apart silently.
 
 ### Changed
 - **Agent contract refinements** (community feedback): SKILL.md opens with the
-  five-line epigraph ("The engine calculates. You think."); §4a now leads with a
+  epigraph ("The engine calculates. You think."); §4a now leads with a
   **bottom-line conditional view** before the evidence table; new **§4b
-  comparison shape** — table-first, interpretation by dimension, winner by
-  category (never a universal winner beyond the evidence), what decides the
-  debate; new **Tone** section — no hype, no caveat walls, prefer "cannot
-  conclude" over fake precision.
+  comparison shape** — bottom line → side-by-side table → interpretation by
+  dimension → winner by category (never a universal winner beyond the
+  evidence) → what decides the debate; new **Tone** section — no hype, no
+  caveat walls, prefer "cannot conclude" over fake precision.
+
+### Fixed
+- Code-review findings #1–#5 (eval/contract drift): `_WATCH` now matches §4b's
+  "what decides the debate"; compare intent weighs via `_COMPARE_TENSION`
+  (per-dimension splits, not bull/bear) and gains "screens better" / "would
+  change the conclusion" conditionals; the epigraph scopes
+  no-verbatim-draft to `ok` status (refuse/learn/clarify drafts are sent
+  as-is — never restyle a refusal); §4b wording clarified (bottom line →
+  table → prose); §4a re-anchors the setup narrative to report
+  regime/metrics.
 
 ## [0.11.0] - 2026-07-12
 
@@ -247,7 +264,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Verb-first CLI over the shared engine; segment-aware Rule of 40; DCF; EV/EBITDA;
   fail-closed net-debt handling; offline fixtures and tests. See the git history.
 
-[Unreleased]: https://github.com/notEhEnG/finance-skills/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/notEhEnG/finance-skills/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/notEhEnG/finance-skills/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/notEhEnG/finance-skills/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/notEhEnG/finance-skills/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/notEhEnG/finance-skills/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/notEhEnG/finance-skills/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/notEhEnG/finance-skills/compare/v0.7.0...v0.8.0
 [0.4.0]: https://github.com/notEhEnG/finance-skills/compare/v0.3.0...v0.4.0
