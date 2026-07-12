@@ -82,8 +82,11 @@ Walkthrough narrative using only section metrics from the report.
 
 ### `compare`
 
-Side-by-side metrics from the compare report only. Secondary risk framing only if
-`secondary_intents` include redflags/health **and** those fields exist; else say so.
+Table-first (SKILL.md §4b): bottom line (per-dimension, no universal winner) →
+side-by-side table from the compare report only → interpretation by dimension
+(growth / profitability / cash flow / leverage / valuation) → winner by category →
+what decides the debate. Secondary risk framing only if `secondary_intents`
+include redflags/health **and** those fields exist; else say so.
 
 ### `framework`
 

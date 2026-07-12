@@ -6,6 +6,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **Agent contract refinements** (community feedback): SKILL.md opens with the
+  five-line epigraph ("The engine calculates. You think."); §4a now leads with a
+  **bottom-line conditional view** before the evidence table; new **§4b
+  comparison shape** — table-first, interpretation by dimension, winner by
+  category (never a universal winner beyond the evidence), what decides the
+  debate; new **Tone** section — no hype, no caveat walls, prefer "cannot
+  conclude" over fake precision.
+
 ## [0.11.0] - 2026-07-12
 
 ### Changed
