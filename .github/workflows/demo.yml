@@ -26,6 +26,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install engine deps
+        run: pip install yfinance
+
+      - name: Warm live-data cache (render must never stall on network)
+        run: |
+          python3 scripts/ask.py "is NBIS a buy?" >/dev/null
+          python3 scripts/ask.py "compare AMD and NVDA" >/dev/null
+
       - name: Render demo.gif
         uses: charmbracelet/vhs-action@v2
         with:

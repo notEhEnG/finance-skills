@@ -1,6 +1,8 @@
 # finance-skills demo tape — render with: vhs docs/demo.tape (from repo root)
-# Regenerates docs/demo.gif deterministically from real engine output
-# (fixtures only — no network), so the demo can never drift from the code.
+# Uses LIVE yfinance data (delayed) — warm the cache first so the render
+# never stalls on network:
+#   python3 scripts/ask.py "is NBIS a buy?" >/dev/null
+#   python3 scripts/ask.py "compare AMD and NVDA" >/dev/null
 
 Output docs/demo.gif
 
@@ -12,29 +14,35 @@ Set Padding 18
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 30ms
 
-Type "# finance-skills — the engine calculates, your agent thinks"
+Type "# [Claude Code]  user: Is NBIS a buy?"
 Enter
-Sleep 1.5s
+Type "# agent runs ONE tool call — live data, engine-computed numbers:"
+Enter
+Sleep 1.2s
 
-Type `python3 scripts/ask.py "is NBIS a buy?" --fixture`
+Type `python3 scripts/ask.py "is NBIS a buy?"`
 Enter
-Sleep 9s
-
-Type "clear"
-Enter
-Type "# comparisons: side-by-side table, leaders marked"
-Enter
-Sleep 1s
-
-Type `python3 scripts/ask.py "compare CRWV and NBIS" --fixture`
-Enter
-Sleep 9s
+Sleep 10s
 
 Type "clear"
 Enter
-Type "# guardrails: personal advice is refused, never answered"
+Type "# [Codex]  user: compare AMD and NVDA"
 Enter
-Sleep 1s
+Type "# side-by-side table, leaders marked — same engine, any agent:"
+Enter
+Sleep 1.2s
+
+Type `python3 scripts/ask.py "compare AMD and NVDA"`
+Enter
+Sleep 10s
+
+Type "clear"
+Enter
+Type "# [Antigravity]  user: should I sell everything and buy NBIS?"
+Enter
+Type "# guardrails: personal advice is refused, never answered:"
+Enter
+Sleep 1.2s
 
 Type `python3 scripts/ask.py "should I sell everything and buy NBIS?"`
 Enter
