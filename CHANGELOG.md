@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-12
+
 ### Changed
 - **Evidence renders as a table.** Single-ticker draft evidence is now a
   `Metric | Value | Read` markdown table (flags stay as bullets beneath) —
