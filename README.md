@@ -19,6 +19,12 @@ curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/main/instal
 /finance-skills is CRWV a buy?
 ```
 
+**Real session — Claude Code answering "is NVDA overvalued?" with live data:**
+
+![agent demo](docs/demo-agent.gif)
+
+*([full-quality video](docs/demo-agent.mp4) · engine-only terminal demo below)*
+
 ![demo](docs/demo.gif)
 
 **Who this is for:** Claude Code / Codex / Antigravity / Cursor-style agent users, and people building tool-using agents who need financial claims they can audit.
