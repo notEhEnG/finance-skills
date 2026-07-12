@@ -227,8 +227,8 @@ _ANALYSIS_INTENTS = (
 # tensions weighed, and forward "what to watch" items named.
 _CONDITIONAL = re.compile(
     r"\b(if you believe|only makes sense if|unless|as long as|depends on|"
-    r"screens (rich|cheap|expensive)|on (available|reported|these) "
-    r"(multiples|assumptions|inputs))\b",
+    r"screens (rich|cheap|expensive|better)|would change the conclusion|"
+    r"on (available|reported|these) (multiples|assumptions|inputs))\b",
     re.I,
 )
 _TENSION = re.compile(
@@ -236,8 +236,15 @@ _TENSION = re.compile(
     r"offset|the (bull|bear) case|would hurt|counter)\b",
     re.I,
 )
+# §4b comparisons weigh via per-dimension splits, not bull/bear prose
+_COMPARE_TENSION = re.compile(
+    r"\b(winner by category|screens better|leads on|edge on|by dimension|"
+    r"mixed|trade[- ]?off|whereas|while)\b",
+    re.I,
+)
 _WATCH = re.compile(
-    r"\b(watch|monitor|track|next quarter|decides which|key signal)\b",
+    r"\b(watch|monitor|track|next quarter|decides which|decides the debate|"
+    r"what decides|key signal)\b",
     re.I,
 )
 
@@ -283,9 +290,11 @@ def synthesis_checks(
             fails.append("courier_verbatim_draft")
 
     # §4a structure: conditional screen, weighed tension, forward watch items.
+    # Compare answers (§4b) weigh via per-dimension splits instead of bull/bear.
     if not _CONDITIONAL.search(low):
         fails.append("no_conditional_thesis_language")
-    if not _TENSION.search(low):
+    tension = _TENSION.search(low) or (intent == "compare" and _COMPARE_TENSION.search(low))
+    if not tension:
         fails.append("no_weighed_tension")
     if not _WATCH.search(low):
         fails.append("no_watch_items")

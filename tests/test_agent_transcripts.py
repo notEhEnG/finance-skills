@@ -178,6 +178,50 @@ class TestSynthesisChecks(unittest.TestCase):
         )
         self.assertEqual(fails, [])
 
+    def test_4b_compare_shape_pins_eval_markers(self):
+        """SKILL.md §4b phrasing and the eval regexes are coupled artifacts:
+        a compare answer written exactly in the §4b shape must score clean."""
+        report = {
+            "tickers": ["CRWV", "NBIS"],
+            "rows": [
+                {"metric": "Revenue growth", "values": [111.1, 684.6]},
+                {"metric": "EV/Sales", "values": [31.3, 5.7]},
+            ],
+        }
+        answer = (
+            "Sample/fixture data, not live. Bottom line: NBIS screens better on "
+            "growth and multiple, CRWV on margins — no universal winner.\n\n"
+            "| Metric | CRWV | NBIS |\n| --- | --- | --- |\n"
+            "| Revenue growth | 111.1% | 684.6% |\n| EV/Sales | 31.3x | 5.7x |\n\n"
+            "Interpretation by dimension: growth favors NBIS, profitability "
+            "favors CRWV, while both burn cash. Winner by category — Growth: "
+            "NBIS · Profitability: CRWV · Risk: mixed.\n"
+            "What decides the debate: FCF margin trajectory and EV/Sales "
+            "compression next quarter. Not investment advice."
+        )
+        fails = agent_eval.synthesis_checks(
+            answer, draft="", report=report, intent="compare", status="ok"
+        )
+        self.assertEqual(fails, [], fails)
+
+
+    def test_4a_shape_pins_eval_markers(self):
+        """§4a-shaped single-ticker answer must score clean (see 4b twin)."""
+        answer_uses = self.out["report"]["engine_report"]["calculations"]
+        vals = [c["value"] for c in answer_uses if c.get("value") is not None][:2]
+        answer = (
+            "Sample/fixture data, not live. Bottom line: this screens as a "
+            "high-growth, cash-burning story. The bull case is growth "
+            f"({vals[0]}%); the bear case is the burn ({vals[1]}% margin) — it "
+            "would hurt the thesis directly. On available multiples it screens "
+            "rich unless growth persists. What to watch: FCF margin and revenue "
+            "growth. Not investment advice."
+        )
+        fails = agent_eval.synthesis_checks(
+            answer, draft=self.draft, report=self.report, intent="valuation", status="ok"
+        )
+        self.assertEqual(fails, [], fails)
+
     def test_score_answer_includes_synthesis(self):
         scored = agent_eval.score_answer(
             self.draft,

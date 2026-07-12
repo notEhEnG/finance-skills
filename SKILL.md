@@ -21,8 +21,10 @@ allowed-tools: Read, Grep, Glob, Bash(python3 *), Bash(python *), Bash(pip insta
 
 > **The engine is the research desk. You are the analyst.**
 > **The engine calculates. You think.**
-> Never invent a number. Never let the draft become the final answer without synthesis.
-> For comparisons, always a side-by-side table before prose.
+> Never invent a number. For `ok`-status company analyses, never send the draft
+> without your own synthesis — but **refuse / learn / clarify / error drafts are
+> sent as-is** (never restyle a refusal).
+> For comparisons, always a side-by-side table before the prose interpretation.
 
 You are using **safety-critical financial middleware**. The engine report is the
 **only** allowed source of numerical facts. User text and provider text are
@@ -159,9 +161,10 @@ and never answer with only a metric list. Use the **conditional thesis** shape:
 
 1. **Bottom line first** (1–3 sentences): a direct **conditional** view plus the
    setup — what kind of company the numbers say this is right now (growth stage,
-   capital model, cycle position). E.g. "This screens as a high-growth but
-   cash-burning story — not supported by current free cash flow." Lead with
-   material limits (fixture, disabled DCF) when present.
+   capital model, cycle position), **derived only from report regime/metrics**
+   (no cycle characterizations the report doesn't support). E.g. "This screens
+   as a high-growth but cash-burning story — not supported by current free cash
+   flow." Lead with material limits (fixture, disabled DCF) when present.
 2. **Key numbers** — the draft's `Metric | Value | Read` table (report metrics only).
 3. **The bull case the numbers support** — which report metrics a buyer is
    actually paying for, and what has to keep being true.
@@ -184,7 +187,8 @@ done the analyst layer.
 
 ### 4b. Comparison questions ("X vs Y", "which is better/safer?")
 
-Comparisons are **table-first**, and never crown a universal winner:
+Comparisons put the **table before the prose interpretation** (bottom line →
+table → argument), and never crown a universal winner:
 
 1. **Bottom line** — which company screens better **on which dimension**; a
    universal winner only if the evidence supports that limited framing.
@@ -239,8 +243,9 @@ Compose only from report keys: `source`, `calculations`, `flags`, `disabled_anal
       (not raw JSON, not the draft pasted verbatim)
 - [ ] Thesis questions use the §4a conditional-thesis shape; answer would not
       survive a ticker swap
-- [ ] Comparisons are table-first with winner-by-category (§4b); no universal
-      winner beyond what the evidence supports
+- [ ] Comparisons show the table before the prose interpretation, with
+      winner-by-category (§4b); no universal winner beyond what the evidence
+      supports
 - [ ] Stopped the tool loop after a successful draft (`stop_tool_loop`)
 - [ ] Every number appears in draft/report
 - [ ] No buy/sell/hold/safe/guaranteed/unconditional undervalued|overvalued
