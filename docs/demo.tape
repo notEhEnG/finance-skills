@@ -1,4 +1,8 @@
 # finance-skills demo tape — render with: vhs docs/demo.tape (from repo root)
+# Frames the terminal as an agent session: a hidden command_not_found_handle
+# routes the typed question straight into scripts/ask.py, so the gif shows
+# only the agent prompt + engine output (no python plumbing).
+#
 # Uses LIVE yfinance data (delayed) — warm the cache first so the render
 # never stalls on network:
 #   python3 scripts/ask.py "is NBIS a buy?" >/dev/null
@@ -12,38 +16,37 @@ Set Width 1400
 Set Height 830
 Set Padding 18
 Set Theme "Catppuccin Mocha"
-Set TypingSpeed 30ms
+Set TypingSpeed 45ms
 
-Type "# [Claude Code]  user: Is NBIS a buy?"
+Hide
+Type `command_not_found_handle() { python3 scripts/ask.py "$*"; }; export PS1="[Claude Code] ❯ "; clear`
 Enter
-Type "# agent runs ONE tool call — live data, engine-computed numbers:"
-Enter
-Sleep 1.2s
+Show
 
-Type `python3 scripts/ask.py "is NBIS a buy?"`
+Sleep 1s
+Type "Is NBIS a buy?"
+Sleep 500ms
 Enter
 Sleep 10s
 
-Type "clear"
+Hide
+Type `export PS1="[Codex] ❯ "; clear`
 Enter
-Type "# [Codex]  user: compare AMD and NVDA"
-Enter
-Type "# side-by-side table, leaders marked — same engine, any agent:"
-Enter
-Sleep 1.2s
+Show
 
-Type `python3 scripts/ask.py "compare AMD and NVDA"`
+Sleep 1s
+Type "compare AMD and NVDA"
+Sleep 500ms
 Enter
 Sleep 10s
 
-Type "clear"
+Hide
+Type `export PS1="[Antigravity] ❯ "; clear`
 Enter
-Type "# [Antigravity]  user: should I sell everything and buy NBIS?"
-Enter
-Type "# guardrails: personal advice is refused, never answered:"
-Enter
-Sleep 1.2s
+Show
 
-Type `python3 scripts/ask.py "should I sell everything and buy NBIS?"`
+Sleep 1s
+Type "should I sell everything and buy NBIS?"
+Sleep 500ms
 Enter
 Sleep 6s
