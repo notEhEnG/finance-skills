@@ -6,6 +6,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **VHS demo pipeline.** `docs/demo.tape` renders `docs/demo.gif` from real
+  engine output (fixtures, no network) via [charmbracelet/vhs] — three scenes:
+  "is NBIS a buy?" (table + disabled DCF + flags), CRWV-vs-NBIS comparison
+  (🏆 side-by-side), and a refused personal-advice request. A `demo.yml`
+  workflow re-renders on tape/renderer changes so the README demo can never
+  drift from the code. Replaces the hand-built Lottie pipeline
+  (`docs/_lottie_render/`, `demo.lottie.json`), which drifted every release.
+
 ### Changed
 - **Agent contract refinements** (community feedback): SKILL.md opens with the
   five-line epigraph ("The engine calculates. You think."); §4a now leads with a

@@ -27,10 +27,6 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# demo render workspace
-docs/_lottie_render/node_modules/
-docs/_lottie_render/frames/
-docs/_lottie_render/package-lock.json
 
 # Agent skill-install copies
 .antigravity/
