@@ -18,6 +18,7 @@ venv/
 # Python build artifacts
 dist/
 build/
+tmp/
 *.egg-info/
 
 # Tooling caches / reports
