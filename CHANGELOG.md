@@ -6,6 +6,52 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-15
+
+### Changed
+- **Financial-methodology correction:** neocloud Rule of 40 now uses the FCF-based
+  score without subtracting capex a second time. The separate proxy is explicitly
+  `EBITDA Rule-40 − capex intensity`, and the broader EBITDA-to-FCF gap is no
+  longer attributed to capex alone. Negative FCF margin cannot receive a green
+  neocloud pass merely because growth is extreme.
+- **Automatic DCF disabled:** the company-analysis path no longer extrapolates
+  revenue growth as ten years of FCF growth. Pure DCF helpers remain available to
+  callers that explicitly supply FCF growth, discount rate, terminal growth,
+  forecast horizon, and net debt; invalid positive-FCF/share gates raise.
+- **Provenance-aware reports:** EngineReport 1.1 carries data state, currency,
+  financial period, retrieval time, source URL, and per-field metadata. Mixed
+  annual/TTM margins fail closed; cache values are labelled `cache`, and fixture
+  metrics are never labelled `live`.
+- **Narrower skill activation:** primary-filing supplements are allowed when
+  separately sourced, dated, and currency-labelled; external values may never be
+  mixed into engine calculations.
+
+### Fixed
+- Framework `ask --fixture` now includes a canonical engine report and mandatory
+  sample-data disclosure. Framework, compare, and screen JSON all expose an
+  EngineReport envelope; multi-company views also expose one envelope per ticker.
+- Natural-language company resolution now handles Ford/F, Intel/INTC, Reddit/RDDT,
+  Shopify/SHOP, Salesforce/CRM, CrowdStrike/CRWD, Berkshire/BRK.B, and CAVA without
+  treating arbitrary short title-case words as symbols. Generic “expensive”
+  questions route to valuation.
+- Numeric transcript lint no longer ignores invented values below 50 or accepts
+  cross-unit values merely because they are within 15% of another report number.
+- Mixed spot/annual share counts no longer produce dilution figures, and
+  cross-currency market-cap/debt/cash inputs no longer produce enterprise value.
+- Text views use the reported ISO currency for non-USD monetary values rather
+  than rendering every market as dollars.
+
+### Security
+- The version-pinned installer copies an allowlisted payload and refuses populated
+  destinations; it performs no cleanup or deletion.
+- Cache/watchlist persistence is append-only. Exports use exclusive creation and
+  refuse existing output paths. AST tests enforce the non-overwriting boundary.
+
+### Documentation
+- Removed unsupported exclusivity/eval claims and uncited benchmark language;
+  built-in thresholds are labelled project heuristics, not market percentiles.
+- Replaced stale Lottie regeneration instructions with the current VHS workflow.
+
 ## [0.12.0] - 2026-07-12
 
 ### Added
@@ -264,7 +310,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Verb-first CLI over the shared engine; segment-aware Rule of 40; DCF; EV/EBITDA;
   fail-closed net-debt handling; offline fixtures and tests. See the git history.
 
-[Unreleased]: https://github.com/notEhEnG/finance-skills/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/notEhEnG/finance-skills/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/notEhEnG/finance-skills/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/notEhEnG/finance-skills/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/notEhEnG/finance-skills/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/notEhEnG/finance-skills/compare/v0.9.0...v0.10.0

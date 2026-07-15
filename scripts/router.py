@@ -91,6 +91,7 @@ KEYWORDS: dict[str, list[str]] = {
     "valuation": ["is it a buy", "is it cheap", "is it expensive", "over valued",
                   "overvalued", "under valued", "undervalued", "fairly valued",
                   "fair value", "worth buying", "priced right", "too expensive",
+                  "expensive", "richly valued", "rich valuation",
                   "how cheap", "cheap or", "should i buy", "whether to buy", "to buy",
                   "a buy", "a sell", "buy or sell", "cheap", "intrinsic value",
                   "discounted cash flow", "fair price", "what is it worth",
@@ -527,7 +528,19 @@ _COMMON_NAMES = {
     "nebius": "NBIS", "coreweave": "CRWV", "palantir": "PLTR", "micron": "MU",
     "tesla": "TSLA", "meta": "META", "amazon": "AMZN", "google": "GOOGL",
     "alphabet": "GOOGL", "broadcom": "AVGO", "netflix": "NFLX", "snowflake": "SNOW",
+    "ford": "F", "intel": "INTC", "reddit": "RDDT", "shopify": "SHOP",
+    "salesforce": "CRM", "crowdstrike": "CRWD", "berkshire": "BRK.B",
 }
+
+# Lowercase bare-symbol support is deliberately finite. Treating every short
+# English word as a ticker made company names such as Ford resolve to the
+# nonexistent FORD. Unknown symbols remain available via standard ALL-CAPS or
+# explicit $ticker syntax.
+_KNOWN_BARE_SYMBOLS = frozenset({
+    *_COMMON_NAMES.values(),
+    "ARM", "ASML", "AVGO", "BRK.B", "CAVA", "CRM", "CRWD", "GOOG", "INTC", "MU",
+    "NOW", "ORCL", "PANW", "QCOM", "RDDT", "SHOP", "SMCI", "TSM", "UBER", "LYFT",
+})
 
 _TICKER_STOPWORDS = {
     "A", "I", "AI", "AN", "AT", "BE", "BY", "DO", "GO", "IF", "IN", "IS", "IT",
@@ -564,6 +577,13 @@ _EXPLICIT_TICKER_RE = re.compile(r"\$([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)\b")
 # Uppercase-only (legacy) and case-insensitive bare symbols (user often types "nbis").
 _BARE_UPPER_RE = re.compile(r"\b([A-Z]{2,5}\.[A-Z]{1,2}|[A-Z]{1,5})\b")
 _BARE_TICKER_CI_RE = re.compile(r"\b([A-Za-z]{2,5}(?:\.[A-Za-z]{1,2})?)\b")
+# Unknown lowercase symbols are accepted only in strong ticker contexts. This
+# retains natural prompts such as "analyze sofi" and "compare sofi and hood"
+# without treating arbitrary Title Case company-like words as tickers.
+_CONTEXTUAL_LOWER_RE = re.compile(
+    r"\b(?:analyze|brief|value|valuation|risk|health|company|stock|ticker|compare|vs|versus|and|is|on|for)\s+"
+    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)\b"
+)
 _TICKER_SHAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,15}$")
 
 
@@ -586,7 +606,14 @@ def extract_tickers(text: str) -> list[str]:
         add(m.group(1))
     # Case-insensitive bare tokens: "nbis", "aapl", "Brk.B" — stopwords filter noise.
     for m in _BARE_TICKER_CI_RE.finditer(text):
+        candidate = m.group(1).upper()
+        if candidate in _KNOWN_BARE_SYMBOLS:
+            add(candidate)
+    for m in _CONTEXTUAL_LOWER_RE.finditer(text):
         add(m.group(1))
+    stripped = text.strip()
+    if stripped == stripped.lower() and _looks_like_ticker(stripped):
+        add(stripped)
     return found
 
 

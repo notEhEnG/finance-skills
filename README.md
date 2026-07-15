@@ -13,7 +13,7 @@ Ask any coding agent "is NBIS a buy?" and you'll get one of two failure modes: c
 
 ```text
 # 1) Install skill (Claude Code)
-curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/main/install.sh | bash -s -- claude
+curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/v0.13.0/install.sh | bash -s -- claude
 
 # 2) In the agent
 /finance-skills is CRWV a buy?
@@ -32,17 +32,17 @@ curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/main/instal
 
 ---
 
-## Why this over every other finance skill
+## Why use this finance skill
 
-Five strengths no other agent finance skill combines:
+Five design strengths:
 
-1. **Numbers are computed, never narrated.** Rule of 40, DCF, EV/Sales, EV/EBITDA, Altman Z, Piotroski — all calculated by tested Python (`scripts/metrics.py`), not "reasoned" by the model. If a number isn't in the engine report, the agent is contractually forbidden from saying it.
+1. **Numbers are computed, never narrated.** Rule of 40 and EV multiples are calculated by tested Python (`scripts/metrics.py`), not "reasoned" by the model. DCF, Altman Z, and Piotroski remain pure helpers that require their stated inputs; the company path never fills them by guesswork. If a number isn't in the engine report, the agent cannot present it as engine output.
 2. **Fail-closed, not fail-plausible.** Missing debt is never a silent zero. Negative FCF doesn't produce a fake DCF — it produces `disabled_analyses` with the reason and the unlock. The skill would rather tell you what it *can't* conclude than invent a conclusion.
 3. **The analyst layer is mandated, not hoped for.** The agent contract ([`SKILL.md`](SKILL.md) §4a) requires a **conditional thesis** — setup, the bull case the numbers support, the bear case, a conditional screen, what to watch — never a metric dump, never "Buy/Hold/Sell + target price." Two tickers must never produce interchangeable answers.
-4. **A public three-tier eval enforces all of it.** Every answer is scorable as **safe → useful → synthesized** ([`docs/eval.md`](docs/eval.md)): hard fails (invented numbers, buy/sell language, hidden disabled DCF, fixture-as-live), usefulness fails (caveat walls, JSON dumps), and synthesis fails — including a **ticker-swap check** that catches generic answers. No other skill ships a checker for its own claims.
-5. **Segment-aware analytics you won't find elsewhere.** The engine knows a neocloud's EBITDA-based Rule of 40 is misleading and judges it on the **capex-adjusted** score and the **capital-intensity gap** — the exact lens the CRWV/NBIS debate needs ([`references/ai-cloud.md`](references/ai-cloud.md), [`references/rule40.md`](references/rule40.md)). Generic skills apply one bar to every business model.
+4. **A public three-tier checker makes the contract testable.** Answers are linted as **safe → useful → synthesized** ([`docs/eval.md`](docs/eval.md)): policy failures, caveat walls/JSON dumps, and generic ticker-swappable prose. It is a deterministic contract checker, not proof of investment accuracy or universal model compliance.
+5. **Capital-intensive growth gets a separate lens.** The engine shows EBITDA- and FCF-based Rule of 40, the broader EBITDA-to-FCF gap, capex intensity, and an explicitly labelled EBITDA-minus-capex proxy. FCF already includes capex, so capex is never deducted from FCF twice ([`references/ai-cloud.md`](references/ai-cloud.md), [`references/rule40.md`](references/rule40.md)).
 
-Plus the basics competitors miss: **no API key, no vendor lock-in** (free yfinance layer + offline fixtures), portable across agents, MIT-licensed, read-only by construction.
+Plus: **no paid API key** (free yfinance layer + explicit offline fixtures), portable across agents, MIT-licensed, and no brokerage/trading side effects. Local cache/watchlist/report writes are append-only or refuse existing paths.
 
 ---
 
@@ -56,7 +56,7 @@ Plus the basics competitors miss: **no API key, no vendor lock-in** (free yfinan
 | Metric dump with no argument | Mandated conditional thesis (§4a) |
 | Fixture demo treated as live tape | `data_state: fixture` + mandatory disclosure |
 
-**Data quality:** live pulls use **yfinance** (delayed, incomplete, label-noisy). Always verify revenue, FCF, debt, cash, shares, and capex in **10-K/10-Q**. Fixtures (CRWV, NBIS) are **sample data, not live**.
+**Data quality:** live pulls use **yfinance** (delayed, incomplete, label-noisy). Reports preserve provider state, currency, retrieval time, financial period, source URL, and per-field period metadata when available; mixed annual/TTM margins fail closed. Always verify revenue, FCF, debt, cash, shares, and capex in **10-K/10-Q**. Fixtures (CRWV, NBIS) are **sample data, not live** and are never automatic fallbacks.
 
 ---
 
@@ -70,7 +70,7 @@ Most agent finance skills on GitHub fall into three classes — each fails a dif
 | **Web-search analysts** | Search results pasted into the context | Unverifiable figures + explicit "Buy/Hold/Sell + target price" output | Fail-closed evidence policy; **never** a recommendation — a conditional valuation screen instead |
 | **API wrappers** | A paid data vendor behind an API key | Data delivery without an analysis contract; vendor lock-in | Free data layer + an explicit **agent contract**: the engine keeps the agent honest, the agent builds the argument |
 
-Prompt-only skills have the analyst layer without the fact layer; API wrappers have the fact layer without the contract. **This skill is the only one with both — and the only one that ships an eval proving it.**
+Prompt-only skills emphasize analyst prose; API wrappers emphasize data delivery. finance-skills combines a deterministic fact layer with an explicit agent contract and a public, reproducible checker.
 
 ---
 
@@ -94,8 +94,8 @@ Prompt-only skills have the analyst layer without the fact layer; API wrappers h
   │              redflags / learn / refuse / …)       │
   │  data.py     yfinance fetch · offline fixtures ·  │
   │              6h cache · fail-closed normalization │
-  │  metrics.py  segment-aware Rule of 40 · DCF ·     │
-  │              EV/Sales · EV/EBITDA · Z · Piotroski │
+  │  metrics.py  Rule of 40 · EV multiples · explicit │
+  │              assumption DCF · Z · Piotroski helpers│
   │  analyze.py  → engine_report: calculations,       │
   │              flags, disabled_analyses, source     │
   └───────────────┬───────────────────────────────────┘
@@ -145,9 +145,13 @@ Full policy: [`SKILL.md`](SKILL.md) · templates: [`docs/agent-policy.md`](docs/
 **Skill (primary)**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/main/install.sh | bash -s -- claude
+curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/v0.13.0/install.sh | bash -s -- claude
 # codex | antigravity | all
 ```
+
+The installer is version-pinned, copies an allowlisted payload, and refuses to
+overwrite an existing skill directory. Set `FINANCE_SKILLS_REF` only when you
+intentionally want a different tag.
 
 | Runtime | Status | Path |
 |---------|--------|------|
@@ -201,10 +205,12 @@ python3 scripts/brief.py CRWV --fixture --json   # includes engine_report
 
 Every core verb JSON includes **`engine_report`**:
 
-- `source.data_state`: live | fixture | unavailable | …
+- `source.data_state`: live | cache | fixture | unavailable | …
 - `disabled_analyses`: reason_code + unlock
 - `response_guidance.prohibited_claims` / `mandatory_caveats`
 - calculations never encode unknown net debt as `0`
+- metric provenance includes currency/period/source metadata when supplied
+- cached snapshots are labelled `cache`, never `live`
 
 Schema: [`docs/engine-report.schema.json`](docs/engine-report.schema.json)
 
@@ -212,11 +218,11 @@ Schema: [`docs/engine-report.schema.json`](docs/engine-report.schema.json)
 
 ## Eval (public)
 
-The only agent finance skill that ships a checker for its own claims. Three tiers ([`docs/eval.md`](docs/eval.md)):
+The repository ships a deterministic contract checker with three tiers ([`docs/eval.md`](docs/eval.md)):
 
 | Tier | Catches |
 |------|---------|
-| **Safe** (hard fails) | invented numbers · buy/sell language · hidden disabled DCF · fixture-as-live |
+| **Safe** (hard fails) | unrecognized report numbers · buy/sell language · hidden disabled DCF · fixture-as-live |
 | **Useful** | caveat walls · raw JSON dumps · answers with no analytical substance |
 | **Synthesized** | `answer_draft` pasted verbatim (courier behavior) · missing conditional-thesis structure · generic answers that would survive a **ticker swap** |
 
@@ -225,6 +231,8 @@ python -m pytest tests/test_agent_transcripts.py tests/test_route_request.py -q
 ```
 
 Plus a 20-prompt bare-model-vs-skill protocol you can re-run on your own model.
+The checker is a policy/provenance lint, not a substitute for validating upstream
+data or financial methodology against filings.
 
 ---
 
@@ -232,6 +240,7 @@ Plus a 20-prompt bare-model-vs-skill protocol you can re-run on your own model.
 
 **Shipped**
 
+- ✅ 0.13.0 — provenance + period alignment, no capex double-counting, explicit-assumption DCF boundary, contract-complete framework/compare/screen JSON, safer routing/eval/install/export persistence
 - ✅ 0.8.x — one-shot `ask` path, table/emoji multi-ticker output, hardened error handling
 - ✅ 0.9.0 — **analyst-layer contract**: fact layer → analyst layer, §4a conditional thesis, `respond_with_synthesis`
 - ✅ 0.10.0 — **synthesis eval tier**: safe → useful → synthesized, ticker-swap proxy, courier detection

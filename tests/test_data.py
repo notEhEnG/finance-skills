@@ -148,6 +148,13 @@ class TestCache(unittest.TestCase):
         got = data._read_cache("TEST")
         self.assertIsNotNone(got)
         self.assertEqual(got.revenue, 100.0)
+        self.assertEqual(got.data_state, "cache")
+        self.assertEqual(len(list(data.CACHE_DIR.glob("TEST-*.json"))), 1)
+
+    def test_cache_writes_are_append_only(self):
+        data._write_cache(self._sample())
+        data._write_cache(self._sample())
+        self.assertEqual(len(list(data.CACHE_DIR.glob("TEST-*.json"))), 2)
 
     def test_get_fundamentals_serves_fresh_cache_without_network(self):
         data._write_cache(self._sample())

@@ -76,6 +76,22 @@ class TestTranscriptHardFails(unittest.TestCase):
         )
         self.assertTrue(any("invented_number" in f for f in fails), fails)
 
+    def test_invented_sub_50_number_fails(self):
+        fails = agent_eval.hard_fail_checks(
+            "Sample data. Revenue growth is 37%. DCF is disabled.",
+            report={"known_metric": 100},
+            expect_fixture=True,
+            expect_dcf_disabled=True,
+        )
+        self.assertIn("possible_invented_number:37%", fails)
+
+    def test_rule_of_40_phrase_is_structural_but_invented_40_percent_fails(self):
+        report = {"known_metric": 100}
+        structural = agent_eval.hard_fail_checks("Rule of 40", report=report)
+        invented = agent_eval.hard_fail_checks("Margin is 40%", report=report)
+        self.assertEqual(structural, [])
+        self.assertIn("possible_invented_number:40%", invented)
+
     def test_route_buy_is_valuation(self):
         self.assertEqual(router.route_request("Is CRWV a buy?").intent, "valuation")
 
@@ -238,13 +254,18 @@ class TestSynthesisChecks(unittest.TestCase):
 
 
 class TestEngineReportOnAllVerbs(unittest.TestCase):
-    def test_valuation_redflags_health_company_analyze(self):
+    def test_all_company_views_include_engine_report(self):
         f = load_fixture("CRWV")
         import analyze
         import company
+        import compare
+        import framework
         import health
         import redflags
+        import screen
         import valuation
+
+        other = analyze.build_report(load_fixture("NBIS"))
 
         for name, payload in [
             ("valuation", valuation.build_valuation(f, as_json=True)),
@@ -253,6 +274,9 @@ class TestEngineReportOnAllVerbs(unittest.TestCase):
             ("company", company.build_company(f, as_json=True)),
             ("analyze", analyze.build_report_view(f, as_json=True)),
             ("brief", brief.build_brief(f, as_json=True)),
+            ("framework", framework.build_framework("neocloud", f, as_json=True)),
+            ("compare", compare.build_compare([analyze.build_report(f), other], as_json=True)),
+            ("screen", screen.screen("growth > 0", ["CRWV", "NBIS"], use_fixture=True)),
         ]:
             with self.subTest(name=name):
                 self.assertIn("engine_report", payload, name)

@@ -14,14 +14,24 @@ DISCLAIMER = (
 )
 
 
-def fmt_money(v: Any) -> str:
+def fmt_money(v: Any, currency: str | None = None) -> str:
     if v is None:
         return "n/a"
+    prefix = "$" if currency in (None, "USD") else f"{currency} "
     a = abs(v)
     for unit, scale in (("T", 1e12), ("B", 1e9), ("M", 1e6)):
         if a >= scale:
-            return f"${v / scale:.2f}{unit}"
-    return f"${v:,.0f}"
+            return f"{prefix}{v / scale:.2f}{unit}"
+    return f"{prefix}{v:,.0f}"
+
+
+def currency_for(report: dict, field: str | None = None) -> str | None:
+    """Prefer a field's quote/reporting currency, then the report currency."""
+    if field:
+        metadata = (report.get("field_metadata") or {}).get(field) or {}
+        if metadata.get("currency"):
+            return metadata["currency"]
+    return report.get("currency")
 
 
 def pct(v: Any) -> str:
@@ -33,11 +43,16 @@ def mult(v: Any) -> str:
 
 
 def source_line(r: dict) -> str:
-    """'Source: … · as of … [SAMPLE DATA]' subheader shared by every report view."""
-    return (
-        f"Source: {r['source']} · as of {r['as_of']}"
-        + ("  [SAMPLE DATA — not live]" if r.get("source") == "fixture" else "")
-    )
+    """Provider, financial period, currency and freshness shared by every view."""
+    state = r.get("data_state") or ("fixture" if r.get("source") == "fixture" else "live")
+    bits = [f"Source: {r.get('source') or 'unknown'}", f"period: {r.get('as_of') or 'unknown'}"]
+    if r.get("currency"):
+        bits.append(f"currency: {r['currency']}")
+    if state == "fixture":
+        bits.append("[SAMPLE DATA — not live]")
+    elif state == "cache":
+        bits.append("[CACHED SNAPSHOT]")
+    return " · ".join(bits)
 
 
 def footer() -> list[str]:

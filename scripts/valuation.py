@@ -1,7 +1,7 @@
 """valuation — the "is it cheap?" view, rendered as a table.
 
 Leads with the valuation slice of the shared engine (DCF, EV/Sales, EV/EBITDA,
-Rule of 40 vs benchmark) laid out as a scannable Metric | Value | Read table, so
+Rule of 40 vs project heuristic) laid out as a scannable Metric | Value | Read table, so
 the takeaway is obvious at a glance. Reuses `analyze.build_report`, so the numbers
 never diverge from `analyze`, `company`, or `framework`.
 
@@ -20,26 +20,42 @@ if __package__:
     from finance_skills import analyze, explain, report_schema
     from finance_skills.cli import has_flag, run_single_ticker
     from finance_skills.data import Fundamentals
-    from finance_skills.format import fmt_money, leverage_cell, mult, pct, render_metric_table, source_line
+    from finance_skills.format import (
+        currency_for,
+        fmt_money,
+        leverage_cell,
+        mult,
+        pct,
+        render_metric_table,
+        source_line,
+    )
 else:
     import analyze
     import explain
     import report_schema
     from cli import has_flag, run_single_ticker
     from data import Fundamentals
-    from format import fmt_money, leverage_cell, mult, pct, render_metric_table, source_line
+    from format import (
+        currency_for,
+        fmt_money,
+        leverage_cell,
+        mult,
+        pct,
+        render_metric_table,
+        source_line,
+    )
 
 
 def _rows(r: dict) -> list[tuple[str, str, str]]:
     """Build (metric, value, read) rows for the valuation table."""
     d = r["derived"]
     rows: list[tuple[str, str, str]] = [
-        ("Price", fmt_money(r.get("price")), "—"),
-        ("Market cap", fmt_money(r.get("market_cap")), "—"),
+        ("Price", fmt_money(r.get("price"), currency_for(r, "price")), "—"),
+        ("Market cap", fmt_money(r.get("market_cap"), currency_for(r, "market_cap")), "—"),
     ]
 
     ev = d.get("enterprise_value")
-    rows.append(("Enterprise value", fmt_money(ev) if ev is not None else "n/a",
+    rows.append(("Enterprise value", fmt_money(ev, currency_for(r)) if ev is not None else "n/a",
                  "market cap + net debt" if ev is not None else "net debt unknown"))
 
     evs = d.get("ev_sales")
@@ -56,13 +72,15 @@ def _rows(r: dict) -> list[tuple[str, str, str]]:
 
     if "dcf" in r:
         ps = r["dcf"].get("per_share")
-        rows.append(("DCF / share", fmt_money(ps), _dcf_read(ps, r.get("price"))))
+        rows.append(("DCF / share", fmt_money(ps, currency_for(r)), _dcf_read(ps, r.get("price"), currency_for(r))))
     else:
         note = r.get("dcf_note", "not computed")
         if "not positive" in note:
             short = "FCF negative — DCF skipped"
         elif "net debt unknown" in note.lower():
             short = "net debt unknown — DCF skipped"
+        elif "explicit FCF-growth" in note:
+            short = "explicit assumptions required — DCF disabled"
         else:
             short = note
         rows.append(("DCF / share", "n/a", short))
@@ -70,8 +88,8 @@ def _rows(r: dict) -> list[tuple[str, str, str]]:
     rule = r.get("rule40")
     if rule:
         verdict = "PASS" if rule["passes"] else "BELOW BAR"
-        rows.append(("Rule of 40", f"{rule['preferred_score']:.0f} vs {rule['benchmark']:.0f}",
-                     f"{verdict} ({rule['regime'].replace('_', ' ')})"))
+        rows.append(("Rule of 40", f"{rule['preferred_score']:.0f} vs project heuristic {rule['benchmark']:.0f}",
+                     f"{verdict} ({rule['regime'].replace('_', ' ')}; project heuristic)"))
     elif "rule40_note" in r:
         rows.append(("Rule of 40", "n/a", "insufficient margin data"))
 
@@ -107,12 +125,12 @@ def _ev_ebitda_read(v) -> str:
     return "moderate"
 
 
-def _dcf_read(ps, price) -> str:
+def _dcf_read(ps, price, currency=None) -> str:
     if ps is None or price is None:
         return "heuristic estimate"
     if ps >= price:
-        return f"above price {fmt_money(price)} → cheap on this DCF (heuristic)"
-    return f"below price {fmt_money(price)} → rich on this DCF (heuristic)"
+        return f"above price {fmt_money(price, currency)} → cheap on this DCF (heuristic)"
+    return f"below price {fmt_money(price, currency)} → rich on this DCF (heuristic)"
 
 
 def _growth_read(v) -> str:
@@ -138,7 +156,7 @@ def _verdict(r: dict) -> str:
     if "dcf" in r and r["dcf"].get("per_share") is not None and r.get("price") is not None:
         ps, price = r["dcf"]["per_share"], r["price"]
         stance = "screens cheap" if ps >= price else "screens rich"
-        return f"{stance} vs a heuristic DCF near {fmt_money(ps)}/share; corroborate with the multiples above."
+        return f"{stance} vs a heuristic DCF near {fmt_money(ps, currency_for(r))}/share; corroborate with the multiples above."
     evs = d.get("ev_sales")
     if evs is None:
         return ("No positive-FCF DCF and EV/Sales isn't computable (net debt or revenue "
@@ -147,8 +165,16 @@ def _verdict(r: dict) -> str:
     if "net debt unknown" in note.lower():
         return (f"No equity DCF (net debt unknown) — expensive on EV/Sales {evs}x only if EV "
                 "itself is known; verify debt/cash before anchoring on multiples.")
-    return (f"No DCF (FCF not positive), so it can't be anchored to intrinsic value — "
-            f"expensive on EV/Sales {evs}x; a growth/backlog bet, not supported by current cash flows.")
+    if "not positive" in note.lower():
+        return (f"No DCF because FCF is not positive; EV/Sales is {evs}x on aligned "
+                "available inputs. This remains a growth thesis not supported by current cash flow.")
+    if "explicit fcf-growth" in note.lower():
+        return (
+            f"Automatic DCF is disabled without explicit assumptions; EV/Sales is {evs}x "
+            "on aligned available inputs. Treat this as a multiples screen, not intrinsic value."
+        )
+    return (f"No DCF on the available inputs; EV/Sales is {evs}x. Verify the missing "
+            "inputs before drawing an intrinsic-value conclusion.")
 
 
 def _scenario_lines(report: dict) -> list[str]:
@@ -162,15 +188,15 @@ def _scenario_lines(report: dict) -> list[str]:
         vs = row.get("vs_price_pct")
         vs_s = f" ({vs:+.1f}% vs price)" if vs is not None else ""
         lines.append(
-            f"    {name:4s}  {fmt_money(row['per_share'])}/sh  "
+            f"    {name:4s}  {fmt_money(row['per_share'], currency_for(report))}/sh  "
             f"g={row['growth_rate']}%  r={row['discount_rate']}%{vs_s}"
         )
     lines.append("  Discount-rate sensitivity (base growth):")
     for label, row in (sc.get("discount_rate") or {}).items():
-        lines.append(f"    {label:8s}  {fmt_money(row['per_share'])}/sh")
+        lines.append(f"    {label:8s}  {fmt_money(row['per_share'], currency_for(report))}/sh")
     lines.append("  FCF conversion (×0.8 / ×1.0 / ×1.2 on starting FCF):")
     for label, row in (sc.get("fcf_conversion") or {}).items():
-        lines.append(f"    {label:8s}  {fmt_money(row['per_share'])}/sh")
+        lines.append(f"    {label:8s}  {fmt_money(row['per_share'], currency_for(report))}/sh")
     return lines
 
 

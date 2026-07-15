@@ -25,6 +25,11 @@
       "type": "object",
       "required": ["provider", "data_state"],
       "properties": {
+        "provider": { "type": "string" },
+        "as_of": { "type": ["string", "null"] },
+        "retrieval_timestamp_utc": { "type": ["string", "null"] },
+        "currency": { "type": ["string", "null"] },
+        "source_url": { "type": ["string", "null"] },
         "data_state": {
           "type": "string",
           "enum": [
@@ -34,8 +39,14 @@
         }
       }
     },
-    "source_facts": { "type": "array" },
-    "calculations": { "type": "array" },
+    "source_facts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/metricValue" }
+    },
+    "calculations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/metricValue" }
+    },
     "flags": { "type": "array" },
     "disabled_analyses": { "type": "array" },
     "filing_verification_checklist": { "type": "array" },
@@ -45,5 +56,28 @@
     },
     "errors": { "type": "array" },
     "warnings": { "type": "array" }
+  },
+  "$defs": {
+    "metricValue": {
+      "type": "object",
+      "required": ["name", "status", "value"],
+      "properties": {
+        "name": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": [
+            "live", "cache", "fixture", "unavailable", "unknown",
+            "invalid", "stale", "not_applicable", "disabled"
+          ]
+        },
+        "value": { "type": ["number", "string", "boolean", "null"] },
+        "units": { "type": ["string", "null"] },
+        "source": { "type": ["string", "null"] },
+        "source_url": { "type": ["string", "null"] },
+        "period_end": { "type": ["string", "null"] },
+        "period_type": { "type": ["string", "null"] },
+        "currency": { "type": ["string", "null"] }
+      }
+    }
   }
 }

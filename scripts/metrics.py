@@ -7,8 +7,8 @@ feeds these functions; `analyze.py` orchestrates them into a report.
 
 The headline capability is a *segment-aware* Rule of 40: instead of a single
 40% threshold, it classifies a company's growth regime, computes Rule 40 under
-both EBITDA and FCF margins, exposes the "capital-intensity gap" between them,
-and compares against a stage/sector-matched benchmark. This is what separates a
+both EBITDA and FCF margins, exposes the broader EBITDA-to-FCF gap between them,
+and compares against a stage/sector project heuristic. This is what separates a
 CoreWeave/Nebius-style neocloud from a mature SaaS name.
 
 All margins and growth rates are expressed in PERCENT (e.g. 40.0 == 40%).
@@ -27,12 +27,13 @@ REGIME_HYPERGROWTH = "hypergrowth"
 REGIME_NEOCLOUD = "ai_neocloud"
 REGIME_EARLY = "early_stage"
 
-# Stage/sector-matched Rule 40 bars (percent), from the 2026 medians in the
-# planning notes. Used for peer context, not as a pass/fail cutoff.
+# Project screening heuristics (percent), not cited market medians or peer
+# percentiles. Expose that status in every report so agents cannot present these
+# constants as empirical benchmarks.
 STAGE_BENCHMARKS = {
-    "early_stage": 18.0,       # sub-$1M ARR, deep negative FCF expected
-    "growth_stage": 35.0,      # $10M-$100M ARR, 31-38% band midpoint
-    "mature": 42.0,            # $100M+ ARR, top-quartile public SaaS
+    "early_stage": 18.0,
+    "growth_stage": 35.0,
+    "mature": 42.0,
 }
 
 SECTOR_BENCHMARKS = {
@@ -40,7 +41,7 @@ SECTOR_BENCHMARKS = {
     "devtools": 34.0,
     "cybersecurity": 21.0,
     "fintech": 22.0,
-    "saas_median": 28.0,       # 2026 B2B SaaS median (FCF-based)
+    "saas_general": 28.0,
 }
 
 
@@ -72,14 +73,15 @@ class Rule40Report:
     revenue_growth: float
     ebitda_margin: float
     fcf_margin: float
-    capex_intensity: float
+    capex_intensity: float | None
     score_ebitda: float          # growth + EBITDA margin
     score_fcf: float             # growth + FCF margin (the honest one)
-    capital_intensity_gap: float  # score_ebitda - score_fcf
-    capex_adjusted_score: float  # score_fcf - capex_intensity ("true burn")
-    dilution_adjusted_score: float  # capex_adjusted - share dilution
+    capital_intensity_gap: float  # EBITDA-to-FCF gap; broader than capex alone
+    capex_adjusted_score: float | None  # EBITDA Rule-40 minus capex intensity proxy
+    dilution_adjusted_score: float | None  # FCF Rule-40 minus share dilution
     preferred_score: float       # the score to actually judge on, per regime
-    benchmark: float             # stage/sector-matched Rule 40 bar
+    benchmark: float             # project-authored stage/sector Rule 40 bar
+    benchmark_kind: str          # project_heuristic (not a market percentile)
     passes: bool                 # preferred_score >= benchmark
     verdict: str
     notes: list[str] = field(default_factory=list)
@@ -92,8 +94,8 @@ def rule40_report(
     revenue_growth: float,
     ebitda_margin: float,
     fcf_margin: float,
-    capex_intensity: float = 0.0,
-    share_dilution: float = 0.0,
+    capex_intensity: float | None = None,
+    share_dilution: float | None = None,
     revenue: float | None = None,
     stage: str | None = None,
     sector_key: str | None = None,
@@ -103,29 +105,49 @@ def rule40_report(
     - share_dilution: YoY growth in diluted share count, percent (penalises
       revenue that was 'bought' with equity).
     - stage: one of STAGE_BENCHMARKS keys; if None, inferred from regime.
-    - sector_key: one of SECTOR_BENCHMARKS keys; overrides stage benchmark.
+    - sector_key: one of SECTOR_BENCHMARKS keys; overrides the stage heuristic.
     """
-    regime = classify_regime(revenue_growth, capex_intensity, revenue)
+    regime = classify_regime(
+        revenue_growth,
+        capex_intensity if capex_intensity is not None else 0.0,
+        revenue,
+    )
 
     score_ebitda = rule40(revenue_growth, ebitda_margin)
     score_fcf = rule40(revenue_growth, fcf_margin)
     gap = round(score_ebitda - score_fcf, 1)
-    capex_adjusted = round(score_fcf - capex_intensity, 1)
-    dilution_adjusted = round(capex_adjusted - share_dilution, 1)
+    # FCF already includes capex. Subtracting capex intensity from the FCF score
+    # would therefore count the same capital spending twice. Keep an explicitly
+    # labelled EBITDA-minus-capex proxy for visibility, while the FCF score is the
+    # cash-economics measure used for the verdict.
+    capex_adjusted = (
+        round(score_ebitda - capex_intensity, 1)
+        if capex_intensity is not None else None
+    )
+    dilution_adjusted = (
+        round(score_fcf - share_dilution, 1)
+        if share_dilution is not None else None
+    )
 
     notes: list[str] = []
+    if capex_intensity is None:
+        notes.append("Capex intensity unavailable; no capex-adjusted score was computed.")
+    if share_dilution is None:
+        notes.append("Comparable share-count periods unavailable; no dilution adjustment was computed.")
 
     # Which score is the fair one to judge on?
     if regime == REGIME_NEOCLOUD:
-        # EBITDA score is wildly inflated; judge on the capex-adjusted burn.
-        preferred = capex_adjusted
+        # EBITDA can flatter a buildout. FCF already captures capex, working
+        # capital, cash taxes and interest, so do not deduct capex a second time.
+        preferred = score_fcf
         notes.append(
-            "Neocloud regime: the EBITDA-based score overstates health; judging on the "
-            "capex-adjusted FCF score to reflect real GPU capital burn."
+            "Neocloud regime: the EBITDA-based score can overstate health; judging on "
+            "the FCF-based score, which already includes GPU capital spending."
         )
         if gap > 50:
             notes.append(
-                f"Large capital-intensity gap ({gap:.0f} pts) — growth is capex-funded, not organically profitable."
+                f"Large EBITDA-to-FCF gap ({gap:.0f} pts) — capex is important, but "
+                "working capital, cash taxes and interest may also contribute."
             )
     elif regime in (REGIME_HYPERGROWTH, REGIME_EARLY):
         preferred = score_fcf
@@ -134,7 +156,7 @@ def rule40_report(
         preferred = score_fcf
         notes.append("Standard regime: FCF-based Rule 40 captures real unit economics better than EBITDA.")
 
-    # Pick a benchmark.
+    # Pick the project heuristic.
     if sector_key and sector_key in SECTOR_BENCHMARKS:
         benchmark = SECTOR_BENCHMARKS[sector_key]
     elif stage and stage in STAGE_BENCHMARKS:
@@ -148,14 +170,18 @@ def rule40_report(
         }[regime]
 
     passes = preferred >= benchmark
-    verdict = _rule40_verdict(regime, preferred, benchmark, gap)
+    if regime == REGIME_NEOCLOUD:
+        # Triple-digit growth can overwhelm even a deeply negative FCF margin in
+        # the arithmetic. Do not award a green pass to a cash-consuming buildout.
+        passes = passes and fcf_margin >= 0
+    verdict = _rule40_verdict(regime, preferred, benchmark, gap, fcf_margin)
 
     return Rule40Report(
         regime=regime,
         revenue_growth=round(revenue_growth, 1),
         ebitda_margin=round(ebitda_margin, 1),
         fcf_margin=round(fcf_margin, 1),
-        capex_intensity=round(capex_intensity, 1),
+        capex_intensity=(round(capex_intensity, 1) if capex_intensity is not None else None),
         score_ebitda=score_ebitda,
         score_fcf=score_fcf,
         capital_intensity_gap=gap,
@@ -163,25 +189,32 @@ def rule40_report(
         dilution_adjusted_score=dilution_adjusted,
         preferred_score=preferred,
         benchmark=benchmark,
+        benchmark_kind="project_heuristic",
         passes=passes,
         verdict=verdict,
         notes=notes,
     )
 
 
-def _rule40_verdict(regime: str, preferred: float, benchmark: float, gap: float) -> str:
+def _rule40_verdict(
+    regime: str,
+    preferred: float,
+    benchmark: float,
+    gap: float,
+    fcf_margin: float,
+) -> str:
     delta = preferred - benchmark
     if regime == REGIME_NEOCLOUD:
-        if preferred < 0:
-            return "Capital-intensive: growth is burning cash faster than it earns; watch backlog/RPO and funding runway."
-        return "Neocloud clearing its capex-adjusted bar — unusually efficient for the regime; verify with backlog and margin guidance."
+        if fcf_margin < 0:
+            return "Cash-consuming growth: FCF margin is negative despite the growth score; watch backlog/RPO and funding runway."
+        return "Neocloud clearing its FCF-based bar; verify with backlog, utilization and margin guidance."
     if delta >= 10:
-        return "Strong: comfortably above its stage/sector Rule 40 bar."
+        return "Strong: comfortably above the project Rule of 40 heuristic."
     if delta >= 0:
-        return "Healthy: meeting its stage/sector Rule 40 bar."
+        return "Healthy: meeting the project Rule of 40 heuristic."
     if delta >= -10:
         return "Below bar: acceptable for the stage but trending needs to improve."
-    return "Weak: materially below its stage/sector Rule 40 bar."
+    return "Weak: materially below the project Rule of 40 heuristic."
 
 
 # --- Valuation ------------------------------------------------------------
@@ -189,17 +222,26 @@ def _rule40_verdict(regime: str, preferred: float, benchmark: float, gap: float)
 def dcf_intrinsic_value(
     fcf: float,
     growth_rate: float,
-    discount_rate: float = 10.0,
-    terminal_growth: float = 3.0,
-    years: int = 10,
+    *,
+    discount_rate: float,
+    terminal_growth: float,
+    years: int,
+    net_debt: float,
     shares_outstanding: float | None = None,
-    net_debt: float = 0.0,
 ) -> dict:
-    """A simple two-stage DCF. Rates in percent. Returns enterprise & per-share value.
+    """Two-stage DCF with caller-supplied assumptions and equity bridge.
 
-    Guards against the classic bug where terminal_growth >= discount_rate makes
-    the Gordon terminal value explode/negative.
+    Rates are percentages. No discount, terminal, horizon, or net-debt default is
+    supplied: callers must choose and disclose each assumption explicitly.
     """
+    if fcf <= 0:
+        raise ValueError("fcf must be positive")
+    if years <= 0:
+        raise ValueError("years must be positive")
+    if shares_outstanding is not None and shares_outstanding <= 0:
+        raise ValueError("shares_outstanding must be positive when supplied")
+    if growth_rate <= -100 or terminal_growth <= -100:
+        raise ValueError("growth rates must be greater than -100%")
     if discount_rate <= terminal_growth:
         raise ValueError("discount_rate must exceed terminal_growth for a finite terminal value")
 
@@ -239,16 +281,16 @@ def dcf_scenarios(
     shares_outstanding: float,
     net_debt: float,
     *,
+    discount_rate: float,
+    terminal_growth: float,
+    years: int,
     price: float | None = None,
-    discount_rate: float = 10.0,
-    terminal_growth: float = 3.0,
-    years: int = 10,
 ) -> dict:
     """Bear/base/bull + discount-rate and FCF-conversion sensitivities.
 
-    Pure helper — call only when DCF inputs are already validated (positive FCF,
-    known net debt, shares). Growth rates are percent; FCF conversion multiplies
-    the starting FCF (0.8 / 1.0 / 1.2) without inventing a new cash line.
+    Pure helper with explicit assumptions. Growth rates are percent; FCF
+    conversion multiplies the starting FCF (0.8 / 1.0 / 1.2) without inventing a
+    new cash line.
     """
     # Growth scenarios around the base (clamped so bear stays non-absurd).
     bear_g = max(base_growth - 10.0, min(base_growth * 0.5, base_growth - 3.0))

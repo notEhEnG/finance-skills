@@ -29,13 +29,14 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 if __package__:
-    from finance_skills import analyze, rank
+    from finance_skills import analyze, rank, report_schema
     from finance_skills.cli import parse_argv
     from finance_skills.data import list_fixtures, load_for_cli
     from finance_skills.format import DISCLAIMER, markdown_table, mult, pct
 else:
     import analyze
     import rank
+    import report_schema
     from cli import parse_argv
     from data import list_fixtures, load_for_cli
     from format import DISCLAIMER, markdown_table, mult, pct
@@ -168,7 +169,7 @@ def screen(rule: str, tickers: list[str], use_fixture: bool = False) -> dict:
         rank.rank_reports(match_reports) if match_reports else rank.rank_reports([])
     )
     md = _markdown_screen_table(results, display_fields)
-    return {
+    payload = {
         "rule": rule,
         "matches": matches,
         "results": results,
@@ -178,7 +179,31 @@ def screen(rule: str, tickers: list[str], use_fixture: bool = False) -> dict:
         "ranking_matches": ranking_matches,
         "ranking_lines": rank.render_ranking(ranking),
         "ranking_matches_lines": rank.render_ranking(ranking_matches),
+        "sources": [
+            {
+                "ticker": rep.get("ticker"),
+                "provider": rep.get("source"),
+                "data_state": rep.get("data_state"),
+                "as_of": rep.get("as_of"),
+                "currency": rep.get("currency"),
+            }
+            for rep in reports
+        ],
     }
+    if reports:
+        out = report_schema.attach_engine_report(
+            payload,
+            reports[0],
+            route={"intent": "screen", "tickers": [r.get("ticker") for r in reports]},
+        )
+        out["engine_reports"] = [
+            report_schema.envelope_from_build_report(
+                report, route={"intent": "screen", "tickers": [report.get("ticker")]}
+            )
+            for report in reports
+        ]
+        return out
+    return payload
 
 
 def _fields_in(rule: str) -> list[str]:

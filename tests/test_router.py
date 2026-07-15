@@ -132,6 +132,10 @@ class TestTickerExtraction(unittest.TestCase):
 
     def test_company_name_maps(self):
         self.assertIn("NVDA", router.extract_tickers("is nvidia a good buy?"))
+        self.assertEqual(router.extract_tickers("is Ford cheap?"), ["F"])
+        self.assertEqual(router.extract_tickers("is Intel overvalued?"), ["INTC"])
+        self.assertEqual(router.extract_tickers("thoughts on Reddit?"), ["RDDT"])
+        self.assertEqual(router.extract_tickers("is Shopify expensive?"), ["SHOP"])
 
     def test_ignores_jargon_words(self):
         self.assertEqual(router.extract_tickers("what is the AI GPU DCF story"), [])
@@ -142,6 +146,19 @@ class TestTickerExtraction(unittest.TestCase):
     def test_class_share_symbols(self):
         self.assertEqual(router.extract_tickers("is BRK.B cheap"), ["BRK.B"])
         self.assertEqual(router.extract_tickers("is brk.b cheap"), ["BRK.B"])
+
+    def test_unknown_title_case_word_is_not_guessed_as_ticker(self):
+        self.assertEqual(router.extract_tickers("is Acme expensive?"), [])
+
+    def test_contextual_unknown_lowercase_symbols_remain_usable(self):
+        self.assertEqual(router.extract_tickers("analyze sofi"), ["SOFI"])
+        self.assertEqual(router.extract_tickers("compare sofi and hood"), ["SOFI", "HOOD"])
+        self.assertEqual(router.extract_tickers("sofi"), ["SOFI"])
+
+    def test_generic_expensive_language_routes_valuation(self):
+        rr = router.route_request("is Cava expensive?")
+        self.assertEqual(rr.intent, "valuation")
+        self.assertEqual(rr.tickers, ["CAVA"])
 
 
 class TestHelpAndRegistry(unittest.TestCase):

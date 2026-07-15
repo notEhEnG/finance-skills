@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
 
 DataState = Literal[
     "live", "cache", "fixture", "unavailable", "unknown", "invalid", "stale", "not_applicable", "disabled"
@@ -27,6 +27,11 @@ class MetricValue:
     definition: str | None = None
     required_inputs: list[str] = field(default_factory=list)
     note: str | None = None
+    source: str | None = None
+    source_url: str | None = None
+    period_end: str | None = None
+    period_type: str | None = None
+    currency: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -59,16 +64,24 @@ class FlagItem:
 
 
 def _mv(name: str, value: Any, *, units: str | None = None, definition: str | None = None,
-        required: list[str] | None = None) -> MetricValue:
+        required: list[str] | None = None, status: DataState = "live",
+        metadata: dict[str, Any] | None = None, source_url: str | None = None) -> MetricValue:
+    metadata = metadata or {}
     if value is None:
         return MetricValue(
             name=name, status="unavailable", value=None, units=units,
             definition=definition, required_inputs=required or [],
             note="unavailable — not computed or not present in source",
+            source=metadata.get("source"), source_url=source_url,
+            period_end=metadata.get("period_end"), period_type=metadata.get("period_type"),
+            currency=metadata.get("currency"),
         )
     return MetricValue(
-        name=name, status="live", value=value, units=units,
+        name=name, status=status, value=value, units=units,
         definition=definition, required_inputs=required or [],
+        source=metadata.get("source"), source_url=source_url,
+        period_end=metadata.get("period_end"), period_type=metadata.get("period_type"),
+        currency=metadata.get("currency"),
     )
 
 
@@ -86,6 +99,7 @@ def reason_code_for_disabled(analysis: str, human: str) -> str:
 def build_response_guidance(
     *,
     source: str | None,
+    data_state: DataState | None = None,
     disabled: list[DisabledAnalysis],
     intent: str | None = None,
 ) -> dict[str, Any]:
@@ -115,6 +129,8 @@ def build_response_guidance(
     ]
     if source == "fixture":
         caveats.insert(0, "fixture_sample_data_not_live")
+    elif data_state == "cache":
+        caveats.insert(0, "cached_snapshot_not_fresh_pull")
     if intent == "valuation":
         caveats.append("buy_question_must_be_reframed_as_analysis")
     return {
@@ -140,6 +156,8 @@ def envelope_from_build_report(
     data_state: DataState
     if not available:
         data_state = "unavailable"
+    elif report.get("data_state") in ("live", "cache", "fixture"):
+        data_state = report["data_state"]
     elif source == "fixture":
         data_state = "fixture"
     elif source == "yfinance":
@@ -164,15 +182,21 @@ def envelope_from_build_report(
             analysis="dcf",
             reason_code=reason_code_for_disabled("dcf", report["dcf_note"]),
             human_reason=report["dcf_note"],
-            missing_inputs=[],
-            unlock="positive FCF + shares + known net debt",
+            missing_inputs=[
+                "explicit FCF growth", "explicit discount rate",
+                "explicit terminal growth", "explicit forecast horizon",
+            ],
+            unlock=(
+                "positive FCF + shares + known net debt + explicit FCF growth, "
+                "discount rate, terminal growth and forecast horizon"
+            ),
         ))
     if report.get("rule40_note") and "rule40" not in report:
         disabled.append(DisabledAnalysis(
             analysis="rule40",
             reason_code=reason_code_for_disabled("rule40", report["rule40_note"]),
             human_reason=report["rule40_note"],
-            missing_inputs=[],
+            missing_inputs=["revenue growth", "EBITDA margin", "FCF margin"],
             unlock="revenue growth + EBITDA margin + FCF margin",
         ))
 
@@ -187,30 +211,49 @@ def envelope_from_build_report(
             ))
 
     d = report.get("derived") or {}
+    field_meta = report.get("field_metadata") or {}
+    source_url = report.get("source_url")
+
+    def meta_for(name: str) -> dict[str, Any]:
+        """Field provenance with conservative report-level fallbacks."""
+        metadata = dict(field_meta.get(name) or {})
+        metadata.setdefault("source", source)
+        metadata.setdefault("period_end", report.get("as_of"))
+        metadata.setdefault("period_type", "sample" if data_state == "fixture" else None)
+        metadata.setdefault("currency", report.get("currency"))
+        return metadata
+
     calculations = [
-        _mv("revenue_growth_pct", d.get("revenue_growth_pct"), units="percent",
+        _mv("revenue_growth_pct", d.get("revenue_growth_pct"), units="percent", status=data_state,
             definition="YoY revenue growth", required=["revenue", "revenue_prior"]),
-        _mv("ebitda_margin_pct", d.get("ebitda_margin_pct"), units="percent",
+        _mv("ebitda_margin_pct", d.get("ebitda_margin_pct"), units="percent", status=data_state,
             definition="EBITDA / revenue", required=["ebitda", "revenue"]),
-        _mv("fcf_margin_pct", d.get("fcf_margin_pct"), units="percent",
+        _mv("fcf_margin_pct", d.get("fcf_margin_pct"), units="percent", status=data_state,
             definition="FCF / revenue", required=["free_cash_flow", "revenue"]),
-        _mv("ev_sales", d.get("ev_sales"), units="multiple",
+        _mv("ev_sales", d.get("ev_sales"), units="multiple", status=data_state,
             definition="EV / sales", required=["market_cap", "net_debt", "revenue"]),
-        _mv("ev_ebitda", d.get("ev_ebitda"), units="multiple",
+        _mv("ev_ebitda", d.get("ev_ebitda"), units="multiple", status=data_state,
             definition="EV / EBITDA", required=["market_cap", "net_debt", "ebitda"]),
-        _mv("net_debt", d.get("net_debt"), units="currency",
+        _mv("net_debt", d.get("net_debt"), units="currency", status=data_state,
+            metadata={
+                "source": source,
+                "period_end": report.get("as_of"),
+                "period_type": "derived",
+                "currency": report.get("currency"),
+            }, source_url=source_url,
             definition="total_debt - total_cash", required=["total_debt", "total_cash"]),
     ]
     if "rule40" in report:
         r40 = report["rule40"]
         calculations.append(_mv(
-            "rule40_preferred", r40.get("preferred_score"), units="score",
-            definition="regime-preferred Rule of 40 score",
+            "rule40_preferred", r40.get("preferred_score"), units="score", status=data_state,
+            definition="regime-preferred Rule of 40 score vs project heuristic (not a peer percentile)",
             required=["revenue_growth", "ebitda_margin", "fcf_margin"],
         ))
     if "dcf" in report:
         calculations.append(_mv(
             "dcf_per_share", (report["dcf"] or {}).get("per_share"), units="currency_per_share",
+            status=data_state,
             definition="heuristic two-stage DCF per share",
             required=["fcf", "shares", "net_debt"],
         ))
@@ -219,18 +262,25 @@ def envelope_from_build_report(
             name="dcf_per_share", status="disabled", value=None,
             units="currency_per_share",
             note=report.get("dcf_note") or "DCF not available",
-            required_inputs=["positive_fcf", "shares_outstanding", "net_debt"],
+            required_inputs=[
+                "positive_fcf", "shares_outstanding", "net_debt",
+                "fcf_growth", "discount_rate", "terminal_growth", "forecast_years",
+            ],
         ))
 
     source_facts = [
-        _mv("price", report.get("price"), units="currency"),
-        _mv("market_cap", report.get("market_cap"), units="currency"),
-        _mv("revenue", d.get("revenue"), units="currency"),
+        _mv("price", report.get("price"), units="currency", status=data_state,
+            metadata=meta_for("price"), source_url=source_url),
+        _mv("market_cap", report.get("market_cap"), units="currency", status=data_state,
+            metadata=meta_for("market_cap"), source_url=source_url),
+        _mv("revenue", d.get("revenue"), units="currency", status=data_state,
+            metadata=meta_for("revenue"), source_url=source_url),
     ]
 
     intent = (route or {}).get("intent")
     guidance = build_response_guidance(
         source=source if available else None,
+        data_state=data_state,
         disabled=disabled,
         intent=intent,
     )
@@ -247,6 +297,8 @@ def envelope_from_build_report(
             "code": "fixture_sample",
             "message": "SAMPLE DATA — not live market data",
         })
+    for warning in report.get("warnings") or []:
+        warnings.append({"code": "period_alignment", "message": str(warning)})
 
     filing = checklist or [
         {"item": "revenue", "where": "Income statement", "why": "Growth and margins"},
@@ -277,10 +329,13 @@ def envelope_from_build_report(
         "source": {
             "provider": source or "unknown",
             "as_of": report.get("as_of"),
-            "retrieval_timestamp_utc": report.get("as_of"),
+            "retrieval_timestamp_utc": report.get("retrieved_at"),
             "data_state": data_state,
+            "currency": report.get("currency"),
+            "source_url": report.get("source_url"),
             "freshness_warning": (
-                "fixture_not_live" if data_state == "fixture" else None
+                "fixture_not_live" if data_state == "fixture"
+                else "cached_snapshot" if data_state == "cache" else None
             ),
         },
         "source_facts": [m.to_dict() for m in source_facts],

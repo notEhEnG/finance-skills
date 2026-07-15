@@ -42,6 +42,14 @@ class TestExport(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertTrue(path.read_text().startswith("# "))
 
+    def test_refuses_to_overwrite_existing_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "existing.md"
+            path.write_text("preserve me", encoding="utf-8")
+            rc = export.main(["NBIS", "--format=md", f"--out={path}", "--fixture"])
+            self.assertEqual(rc, 2)
+            self.assertEqual(path.read_text(encoding="utf-8"), "preserve me")
+
 
 if __name__ == "__main__":
     unittest.main()

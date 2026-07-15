@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 
 if not __package__:
@@ -43,14 +44,25 @@ STORE = CACHE_DIR / "watchlists.json"
 
 def _load() -> dict[str, list[str]]:
     try:
-        return json.loads(STORE.read_text(encoding="utf-8"))
+        candidates = list(STORE.parent.glob(f"{STORE.stem}-*.json"))
+        if STORE.is_file():
+            candidates.append(STORE)
+        if not candidates:
+            return {}
+        latest = max(candidates, key=lambda path: path.stat().st_mtime_ns)
+        return json.loads(latest.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
 
 
 def _save(data: dict[str, list[str]]) -> None:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    STORE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    # Append-only snapshots preserve prior lists and removals for recovery.
+    target = STORE if not STORE.exists() else STORE.with_name(
+        f"{STORE.stem}-{time.time_ns()}{STORE.suffix}"
+    )
+    with target.open("x", encoding="utf-8") as handle:
+        handle.write(json.dumps(data, indent=2))
 
 
 def _get(data: dict, name: str) -> list[str]:

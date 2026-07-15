@@ -99,25 +99,30 @@ def disabled_analyses(f: Fundamentals, report: dict[str, Any]) -> list[dict[str,
         if not f.shares_outstanding:
             miss.append("shares outstanding")
             reason_parts.append("shares outstanding is missing")
-        if f.net_debt is None:
+        if d.get("net_debt") is None:
             if f.total_debt is None:
                 miss.append("total debt")
             if f.total_cash is None:
                 miss.append("total cash")
-            reason_parts.append("net debt unknown (need both debt and cash)")
+            reason_parts.append(
+                "net debt unavailable (need both debt and cash in matching currencies)"
+            )
         reason = report.get("dcf_note") or (
             "DCF skipped because " + "; ".join(reason_parts)
             if reason_parts
             else "DCF not computed"
         )
-        # Prefer precise composed reason when we can
-        if reason_parts:
-            reason = "DCF skipped because " + "; ".join(reason_parts)
+        for assumption in (
+            "explicit FCF growth", "explicit discount rate",
+            "explicit terminal growth", "explicit forecast horizon",
+        ):
+            miss.append(assumption)
         add(
             "dcf",
             reason,
             miss,
-            "positive FCF + shares outstanding + total debt + cash on the balance sheet",
+            "positive FCF + shares + known net debt + explicit FCF growth, discount rate, "
+            "terminal growth and forecast horizon",
         )
 
     # EV multiples
@@ -125,7 +130,7 @@ def disabled_analyses(f: Fundamentals, report: dict[str, Any]) -> list[dict[str,
         miss = []
         if f.market_cap is None:
             miss.append("market cap")
-        if f.net_debt is None:
+        if d.get("net_debt") is None:
             if f.total_debt is None:
                 miss.append("total debt")
             if f.total_cash is None:
@@ -163,7 +168,7 @@ def disabled_analyses(f: Fundamentals, report: dict[str, Any]) -> list[dict[str,
         miss = []
         if f.ebitda is None or (f.ebitda is not None and f.ebitda <= 0):
             miss.append("positive EBITDA")
-        if f.net_debt is None:
+        if d.get("net_debt") is None:
             if f.total_debt is None:
                 miss.append("total debt")
             if f.total_cash is None:

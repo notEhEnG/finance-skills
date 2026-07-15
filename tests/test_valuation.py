@@ -24,10 +24,11 @@ class TestValuation(unittest.TestCase):
             self.assertIn(expected, metrics)
 
     def test_dcf_skipped_when_fcf_negative(self):
-        rows = {row["metric"]: row for row in
-                valuation.build_valuation(load_fixture("CRWV"), as_json=True)["rows"]}
+        payload = valuation.build_valuation(load_fixture("CRWV"), as_json=True)
+        rows = {row["metric"]: row for row in payload["rows"]}
         self.assertEqual(rows["DCF / share"]["value"], "n/a")
         self.assertIn("FCF negative", rows["DCF / share"]["read"])
+        self.assertIn("FCF is not positive", payload["verdict"])
 
     def test_ev_ebitda_distortion_flagged(self):
         # EBITDA > revenue (margin >100%) must be flagged, and EV/Sales preferred.

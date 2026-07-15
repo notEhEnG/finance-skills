@@ -6,6 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
+import ask
 import framework
 from data import load_fixture
 
@@ -33,6 +34,16 @@ class TestFramework(unittest.TestCase):
         for kpi_metric in ("Magic Number", "CAC payback", "Net revenue retention (NRR)"):
             self.assertIsNone(rows[kpi_metric]["value"])
             self.assertIsNotNone(rows[kpi_metric]["kpi"])
+
+    def test_json_has_canonical_engine_report(self):
+        r = framework.build_framework("neocloud", load_fixture("CRWV"), as_json=True)
+        self.assertIn("engine_report", r)
+        self.assertEqual(r["engine_report"]["source"]["data_state"], "fixture")
+
+    def test_ask_framework_discloses_fixture(self):
+        out = ask.run_ask("neocloud framework for CRWV", use_fixture=True)
+        self.assertTrue(out["has_engine_report"])
+        self.assertIn("Sample/fixture", out["answer_draft"])
 
     def test_text_render_labels_kpis_and_sample_data(self):
         text = framework.build_framework("saas", load_fixture("CRWV"), as_json=False)

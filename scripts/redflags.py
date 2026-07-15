@@ -67,9 +67,9 @@ def flags_for(report: dict, *, limit: int | None = None) -> list[dict]:
 
     rule = report.get("rule40")
     if rule and rule.get("capital_intensity_gap", 0) > 40:
-        add(MED, "Capital-intensity gap",
+        add(MED, "EBITDA-to-FCF gap",
             f"EBITDA Rule-40 beats FCF Rule-40 by {rule['capital_intensity_gap']:.0f} pts — "
-            "growth is capex-funded, not organically profitable.")
+            "inspect capex, working capital, cash taxes and interest before assigning the cause.")
 
     em = d.get("ebitda_margin_pct")
     if em is not None and em > 100:

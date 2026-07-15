@@ -34,6 +34,10 @@ Skip-tools / quick-take / from-knowledge still require the skill for in-scope co
 | Interpretation | Conditional prose about those fields | New numbers; buy/sell; “safe stock” |
 | Limitation | `disabled_analyses`, fixture source, errors | Omitting material disabled analysis |
 
+Primary-filing facts may supplement the report in a separate, attributed section
+with URL, fiscal period, and currency. Never mix them into engine calculations or
+describe them as engine-verified values.
+
 **Prohibited conclusion tokens** (as unconditional conclusions):  
 buy, sell, hold, guaranteed, safe (as verdict), undervalued, overvalued  
 (Conditional: “EV/Sales screens rich **on available multiples**” is OK if EV/S is in report.)
@@ -68,7 +72,7 @@ valuation slice. Lead with fixture/disabled if present.
 
 Frame “is it cheap / a buy?” as a **conditional thesis** (SKILL.md §4a): setup,
 bull case the numbers support, bear case the numbers support, conditional screen
-(available multiples + DCF **if enabled**), what to watch, and what cannot be
+(available multiples + DCF only from an explicit-assumption caller), what to watch, and what cannot be
 concluded. Never recommend purchase.
 
 ### `redflags` / `health`

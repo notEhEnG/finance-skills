@@ -92,6 +92,8 @@ def _limit_lead(report: dict[str, Any] | None, intent: str | None) -> list[str]:
     state = _source_state(report)
     if state == "fixture":
         leads.append("**Sample/fixture data (not live market data).**")
+    elif state == "cache":
+        leads.append("**Cached snapshot (not a fresh market-data pull).**")
     elif state == "unavailable":
         leads.append("**Company data unavailable** from the engine.")
     for d in _disabled(report):
@@ -172,7 +174,7 @@ def _evidence_lines(report: dict[str, Any], intent: str) -> list[str]:
             bar = rule.get("benchmark")
             tag = "PASS" if rule.get("passes") else "BELOW BAR"
             cells.append(
-                ("Rule of 40", f"preferred {rule['preferred_score']:.0f}", f"vs bar {bar} → {tag}")
+                ("Rule of 40", f"preferred {rule['preferred_score']:.0f}", f"vs project heuristic {bar} → {tag}")
             )
         val = report.get("valuation") or {}
         if val.get("ev_sales") is not None:

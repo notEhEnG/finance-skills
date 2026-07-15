@@ -9,26 +9,25 @@ the user mentions GPU capacity, backlog/RPO, or capex intensity.
 
 ## What to evaluate (beyond the standard report)
 
-1. **Capex intensity** — capex/revenue. Neoclouds routinely exceed 300–500%
-   during buildout. This is the denominator behind the capex-adjusted Rule 40.
+1. **Capex intensity** — capex/revenue, shown separately from FCF-based Rule of 40
+   so capex is not counted twice.
 2. **Funding runway** — net debt, cash, and the financing mix (debt vs equity vs
    vendor/GPU financing). Buildout is pre-funded; runway is the survival metric.
-3. **Backlog / RPO** — remaining performance obligations. A stronger forward
-   signal than trailing growth; CoreWeave's backlog approached ~$100B in Q1 2026.
-   Pull from filings/press where yfinance lacks the field, and label the source.
+3. **Backlog / RPO** — remaining performance obligations. Pull from the latest
+   filing where yfinance lacks the field; label source, fiscal period and currency.
 4. **Utilization & contract quality** — booked vs live GPU capacity, contract
    duration, and customer concentration (a few hyperscaler/anchor tenants is
    common and is itself a risk — cross-reference the risk view).
 5. **Dilution** — SBC and equity raises fund growth; the dilution-adjusted score
    avoids over-crediting revenue bought with shares.
 6. **Margin trajectory vs guidance** — compare current adjusted-EBITDA margin to
-   management's target (e.g. Nebius guiding to ~40%). Growth alone is not the story.
+   sourced management guidance. Growth alone is not the story.
 
 ## How to present a neocloud verdict
 
-- Lead with the **capex-adjusted Rule of 40** and the **capital-intensity gap**,
-  not the flattering EBITDA score.
-- State the funding runway and 2026 capex plan explicitly.
+- Lead with the **FCF-based Rule of 40**, FCF margin, capex intensity, and the
+  broader EBITDA-to-FCF gap—not the flattering EBITDA score alone.
+- State funding runway and the latest sourced capex plan explicitly.
 - Frame backlog/RPO as the forward signal, with its source and as-of date.
 - Be explicit about what yfinance **cannot** provide (backlog, utilization) so the
   user knows which parts need a filing check.

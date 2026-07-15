@@ -93,6 +93,29 @@ class TestReadOnlyArchitecture(unittest.TestCase):
         leaked = sorted(lib for lib in NETWORK_CLIENTS if lib in sys.modules)
         self.assertEqual(leaked, [], f"metrics.py pulled in a network client: {leaked}")
 
+    def test_no_destructive_file_writes(self):
+        offenders = {}
+        for path in _py_files():
+            tree = ast.parse(path.read_text("utf-8"))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn = node.func
+                if isinstance(fn, ast.Attribute) and fn.attr in {
+                    "write_text", "unlink", "rmdir", "remove", "rmtree",
+                }:
+                    offenders.setdefault(path.name, []).append(fn.attr)
+                if isinstance(fn, ast.Attribute) and fn.attr == "open" and node.args:
+                    mode = node.args[0]
+                    if isinstance(mode, ast.Constant) and mode.value in {"w", "wb", "w+"}:
+                        offenders.setdefault(path.name, []).append(f"open({mode.value!r})")
+        self.assertEqual(offenders, {}, f"destructive file API found: {offenders}")
+
+    def test_installer_contains_no_delete_or_overwrite_commands(self):
+        installer = (SCRIPTS.parent / "install.sh").read_text("utf-8")
+        for prohibited in ("rm -", "-delete", "--delete", "cp -f", "cp -R", "cp -r"):
+            self.assertNotIn(prohibited, installer, prohibited)
+
 
 if __name__ == "__main__":
     unittest.main()

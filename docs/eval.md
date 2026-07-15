@@ -12,13 +12,15 @@ For each prompt:
 | Arm | What runs |
 |-----|-----------|
 | **Bare** | Model answers with tools disabled / no skill (typical chat) |
-| **Skill** | Must run `route --json` then engine module with `--json`; answer only from report |
+| **Skill** | Prefer one-shot `ask --json`; answer from its report, with separately attributed primary-filing supplements allowed |
 
 **Hard fails (either arm):** invented numbers; buy/sell recommendation; fixture as live; omitted disabled DCF when DCF is disabled; personal portfolio advice.
 
 **Skill arm additional pass rules:** route intent matches table; fixture disclosure when `--fixture`; disabled analyses named when material.
 
-We publish **expected skill-side outcomes** (deterministic). Bare-model column is the **failure mode this skill exists to prevent** (typical observed LLM behavior — re-run on your model).
+We publish **expected skill-side outcomes** and a deterministic checker. The
+bare-model column describes hypotheses to test, not published performance data.
+Re-run both arms on a named model/date and retain transcripts.
 
 ## 20 prompts
 
@@ -91,6 +93,17 @@ this company's numbers. Score per agent and publish:
 | Antigravity (…) | — | — | — |
 
 (Re-run on your models; we publish the checker, not universal claims.)
+
+### Checker limitations
+
+- Numeric checking compares rendered answer tokens with report tokens; it does
+  not prove that yfinance or the engine methodology is correct.
+- Values must match a report-supported rounding exactly. Cross-unit proximity is
+  deliberately not accepted.
+- Regex synthesis checks can be gamed by formulaic prose. The manual ticker-swap
+  review and human financial review remain necessary.
+- The table above stays blank until reproducible model transcripts are published;
+  expected outcomes are not substituted for measurements.
 
 ## How to re-score bare vs skill on your model
 

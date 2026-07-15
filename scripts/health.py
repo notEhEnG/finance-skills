@@ -22,6 +22,7 @@ if __package__:
     from finance_skills.cli import run_single_ticker
     from finance_skills.data import Fundamentals
     from finance_skills.format import (
+        currency_for,
         fmt_money,
         leverage_cell,
         pct,
@@ -33,7 +34,7 @@ else:
     import report_schema
     from cli import run_single_ticker
     from data import Fundamentals
-    from format import fmt_money, leverage_cell, pct, render_metric_table, source_line
+    from format import currency_for, fmt_money, leverage_cell, pct, render_metric_table, source_line
 
 
 def _runway(f: Fundamentals) -> tuple[str, str]:
@@ -56,9 +57,9 @@ def _rows(f: Fundamentals, r: dict) -> list[tuple[str, str, str]]:
     if nd is None:
         rows.append(("Net debt", "n/a", "debt or cash not disclosed — can't judge leverage"))
     elif nd < 0:
-        rows.append(("Net cash", fmt_money(-nd), "more cash than debt — a solvency cushion"))
+        rows.append(("Net cash", fmt_money(-nd, currency_for(r)), "more cash than debt — a solvency cushion"))
     else:
-        rows.append(("Net debt", fmt_money(nd), "carries more debt than cash"))
+        rows.append(("Net debt", fmt_money(nd, currency_for(r)), "carries more debt than cash"))
 
     lev = (r.get("leverage") or {}).get("net_debt_to_ebitda")
     if lev is not None:

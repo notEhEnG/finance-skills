@@ -45,6 +45,9 @@ class TestWatchlist(unittest.TestCase):
         _run(["add", "CRWV", "--name=neo"])
         _run(["add", "CRWV", "--name=neo"])
         self.assertEqual(watchlist._load()["neo"], ["CRWV"])
+        # Both states remain recoverable; persistence never overwrites the first.
+        snapshots = [watchlist.STORE, *watchlist.STORE.parent.glob("watchlists-*.json")]
+        self.assertEqual(sum(path.is_file() for path in snapshots), 2)
 
     def test_run_verb_over_list(self):
         _run(["add", "CRWV", "NBIS", "--name=neo"])

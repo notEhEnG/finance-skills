@@ -25,7 +25,7 @@ if __package__:
     from finance_skills import analyze, metrics, redflags, report_schema
     from finance_skills.cli import run_single_ticker
     from finance_skills.data import Fundamentals
-    from finance_skills.format import fmt_money, footer, leverage_cell, pct, source_line
+    from finance_skills.format import currency_for, fmt_money, footer, leverage_cell, pct, source_line
 else:
     import analyze
     import metrics
@@ -33,7 +33,7 @@ else:
     import report_schema
     from cli import run_single_ticker
     from data import Fundamentals
-    from format import fmt_money, footer, leverage_cell, pct, source_line
+    from format import currency_for, fmt_money, footer, leverage_cell, pct, source_line
 
 ARROW = "        ▼"
 
@@ -77,7 +77,7 @@ def _story(r: dict) -> list[tuple[str, list[str]]]:
     sections.append(("Competitive Advantage", edge))
 
     # 3. Revenue Drivers
-    rev = [f"Revenue: {fmt_money(d.get('revenue'))}"]
+    rev = [f"Revenue: {fmt_money(d.get('revenue'), currency_for(r, 'revenue'))}"]
     if d["revenue_growth_pct"] is None:
         rev.append("Growth: n/a (no comparable prior period in the data).")
     else:
@@ -102,7 +102,7 @@ def _story(r: dict) -> list[tuple[str, list[str]]]:
     if d["net_debt"] is None:
         health.append("Net debt: n/a — debt or cash missing from the data; leverage left uncomputed rather than guessed.")
     else:
-        health.append(f"Net debt: {fmt_money(d['net_debt'])}"
+        health.append(f"Net debt: {fmt_money(d['net_debt'], currency_for(r))}"
                       + (" (net cash)" if d["net_debt"] < 0 else ""))
     lev = (r.get("leverage") or {}).get("net_debt_to_ebitda")
     if lev is not None:
@@ -119,8 +119,8 @@ def _story(r: dict) -> list[tuple[str, list[str]]]:
     # 7. Valuation
     val: list[str] = []
     if "dcf" in r:
-        val.append(f"DCF intrinsic ≈ {fmt_money(r['dcf']['per_share'])}/share "
-                   f"vs price {fmt_money(r.get('price'))}.")
+        val.append(f"DCF intrinsic ≈ {fmt_money(r['dcf']['per_share'], currency_for(r))}/share "
+                   f"vs price {fmt_money(r.get('price'), currency_for(r, 'price'))}.")
         if "dcf_basis" in r:
             val.append(r["dcf_basis"])
     elif "dcf_note" in r:
@@ -158,9 +158,9 @@ def _verdict(r: dict, regime: str | None) -> list[str]:
         parts.append("Clears its Rule-of-40 bar." if rule.get("passes")
                      else "Falls short of its Rule-of-40 bar today.")
     if "dcf" in r:
-        parts.append(f"DCF anchors fair value near {fmt_money(r['dcf']['per_share'])}/share — a heuristic, not a target.")
+        parts.append(f"DCF anchors fair value near {fmt_money(r['dcf']['per_share'], currency_for(r))}/share — a heuristic, not a target.")
     elif "dcf_note" in r:
-        parts.append("No DCF on the fetched inputs, so lean on Rule-of-40 and multiples instead of intrinsic value.")
+        parts.append("Automatic DCF is disabled; use aligned multiples and Rule-of-40, or supply and disclose assumptions separately.")
     parts.append("Not a recommendation — verify against primary filings before acting.")
     return parts
 
@@ -182,7 +182,8 @@ def _render(r: dict, sections: list[tuple[str, list[str]]]) -> str:
     out = [
         f"═══ {r['name'] or r['ticker']} ({r['ticker']}) — company walkthrough ═══",
         source_line(r),
-        f"Price: {fmt_money(r.get('price'))}   Market cap: {fmt_money(r.get('market_cap'))}",
+        f"Price: {fmt_money(r.get('price'), currency_for(r, 'price'))}   "
+        f"Market cap: {fmt_money(r.get('market_cap'), currency_for(r, 'market_cap'))}",
         "",
     ]
     for i, (heading, lines) in enumerate(sections):

@@ -20,24 +20,25 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 if __package__:
-    from finance_skills import analyze, peers, rank
+    from finance_skills import analyze, peers, rank, report_schema
     from finance_skills.cli import flag_value, parse_argv
     from finance_skills.data import load_for_cli
-    from finance_skills.format import fmt_money, footer, leverage_cell, mult, pct, source_line
+    from finance_skills.format import currency_for, fmt_money, footer, leverage_cell, mult, pct, source_line
 else:
     import analyze
     import peers
     import rank
+    import report_schema
     from cli import flag_value, parse_argv
     from data import load_for_cli
-    from format import fmt_money, footer, leverage_cell, mult, pct, source_line
+    from format import currency_for, fmt_money, footer, leverage_cell, mult, pct, source_line
 
 
 def _rule40_cell(r: dict) -> str:
     x = r.get("rule40")
     if not x:
         return "n/a"
-    return f"{x['preferred_score']:.0f} vs {x['benchmark']:.0f} {'✓' if x['passes'] else '✗'}"
+    return f"{x['preferred_score']:.0f} vs project heuristic {x['benchmark']:.0f} {'✓' if x['passes'] else '✗'}"
 
 
 def _dcf_cell(r: dict) -> str:
@@ -45,7 +46,7 @@ def _dcf_cell(r: dict) -> str:
         return "n/a"
     ps, price = r["dcf"]["per_share"], r.get("price")
     tag = "" if price is None else (" (cheap)" if ps >= price else " (rich)")
-    return f"{fmt_money(ps)}{tag}"
+    return f"{fmt_money(ps, currency_for(r))}{tag}"
 
 
 def _lev_cell(r: dict) -> str:
@@ -78,9 +79,9 @@ def _raw_lev(r: dict) -> float | None:
 RowSpec = tuple[str, Callable[[dict], str], Callable[[dict], float | None], bool | None]
 
 ROWS: list[RowSpec] = [
-    ("Price",              lambda r: fmt_money(r.get("price")),
+    ("Price",              lambda r: fmt_money(r.get("price"), currency_for(r, "price")),
      lambda r: r.get("price"), None),
-    ("Market cap",         lambda r: fmt_money(r.get("market_cap")),
+    ("Market cap",         lambda r: fmt_money(r.get("market_cap"), currency_for(r, "market_cap")),
      lambda r: r.get("market_cap"), None),
     ("Revenue growth",     lambda r: pct(r["derived"].get("revenue_growth_pct")),
      lambda r: r["derived"].get("revenue_growth_pct"), True),
@@ -276,7 +277,7 @@ def build_compare(reports: list[dict], as_json: bool = False, *, preset: str | N
     verdict = _verdict_from_ranking(ranking, tickers)
 
     if as_json:
-        return {
+        payload = {
             "tickers": tickers,
             "preset": preset,
             "verdict": verdict,
@@ -300,7 +301,31 @@ def build_compare(reports: list[dict], as_json: bool = False, *, preset: str | N
                 "leader": f"{_LEADER} **bold** = best on that row (higher or lower as marked)",
                 "warn": f"{_WARN} = worst on concerning rows (FCF burn, leverage)",
             },
+            "sources": [
+                {
+                    "ticker": r.get("ticker"),
+                    "provider": r.get("source"),
+                    "data_state": r.get("data_state"),
+                    "as_of": r.get("as_of"),
+                    "retrieved_at": r.get("retrieved_at"),
+                    "currency": r.get("currency"),
+                    "source_url": r.get("source_url"),
+                }
+                for r in reports
+            ],
         }
+        out = report_schema.attach_engine_report(
+            payload,
+            reports[0],
+            route={"intent": "compare", "tickers": tickers},
+        )
+        out["engine_reports"] = [
+            report_schema.envelope_from_build_report(
+                report, route={"intent": "compare", "tickers": tickers}
+            )
+            for report in reports
+        ]
+        return out
     return _render(
         reports,
         ranking=ranking,

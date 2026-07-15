@@ -104,7 +104,7 @@ class TestDiagnostics(unittest.TestCase):
 
 
 class TestScenarios(unittest.TestCase):
-    def test_dcf_scenarios_on_positive_fcf(self):
+    def test_automatic_dcf_is_disabled_on_positive_fcf(self):
         f = Fundamentals(
             ticker="Y", available=True, source="fixture",
             revenue=300e6, revenue_prior=100e6,
@@ -113,28 +113,24 @@ class TestScenarios(unittest.TestCase):
             price=50.0, market_cap=500e6,
         )
         r = analyze.build_report(f)
-        self.assertIn("dcf", r)
-        sc = r["dcf_scenarios"]
-        self.assertIn("bear", sc["growth"])
-        self.assertIn("base", sc["growth"])
-        self.assertIn("bull", sc["growth"])
-        # Bull growth >= base growth
-        self.assertGreaterEqual(sc["growth"]["bull"]["growth_rate"], sc["growth"]["base"]["growth_rate"])
-        self.assertEqual(len(sc["discount_rate"]), 3)
-        self.assertEqual(len(sc["fcf_conversion"]), 3)
+        self.assertNotIn("dcf", r)
+        self.assertIn("explicit FCF-growth", r["dcf_note"])
         text = analyze.format_report(r)
-        self.assertIn("Scenarios", text)
-        self.assertIn("bear", text)
+        self.assertIn("DCF disabled", text)
 
         import valuation
         vtext = valuation.build_valuation(f, as_json=False, flags={"--explain"})
-        self.assertIn("Scenarios", vtext)
+        self.assertIn("explicit", vtext)
         self.assertIn("Why this matters", vtext)
         vjson = valuation.build_valuation(f, as_json=True, flags={"--explain"})
         self.assertIn("dcf_scenarios", vjson)
+        self.assertIsNone(vjson["dcf_scenarios"])
 
     def test_pure_helper_monotonic_in_growth(self):
-        a = metrics.dcf_scenarios(1e9, 10.0, 1e8, 0.0, price=20.0)
+        a = metrics.dcf_scenarios(
+            1e9, 10.0, 1e8, 0.0,
+            discount_rate=10.0, terminal_growth=3.0, years=10, price=20.0,
+        )
         self.assertLess(a["growth"]["bear"]["per_share"], a["growth"]["bull"]["per_share"])
 
 

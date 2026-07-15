@@ -24,6 +24,11 @@ class TestCompare(unittest.TestCase):
     def test_json_has_a_value_per_ticker_per_row(self):
         r = compare.build_compare(_reports("CRWV", "NBIS"), as_json=True)
         self.assertEqual(r["tickers"], ["CRWV", "NBIS"])
+        self.assertEqual(len(r["engine_reports"]), 2)
+        self.assertEqual(
+            [e["company"]["resolved_symbol"] for e in r["engine_reports"]],
+            ["CRWV", "NBIS"],
+        )
         for row in r["rows"]:
             self.assertEqual(set(row["values"]), {"CRWV", "NBIS"})
             self.assertIn("highlighted", row)

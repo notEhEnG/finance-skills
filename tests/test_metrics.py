@@ -38,10 +38,20 @@ class TestRule40(unittest.TestCase):
         self.assertEqual(r.score_ebitda, 697.0)
         self.assertEqual(r.score_fcf, 234.0)                 # 684 + (-450)
         self.assertEqual(r.capital_intensity_gap, 463.0)     # 697 - 234, matches the notes
-        self.assertEqual(r.capex_adjusted_score, 234.0 - 507)
-        # Neocloud is judged on the capex-adjusted (burn) score, not the flattering EBITDA one.
-        self.assertEqual(r.preferred_score, r.capex_adjusted_score)
+        self.assertEqual(r.capex_adjusted_score, 697.0 - 507)
+        # FCF already includes capex, so the preferred score must not deduct it twice.
+        self.assertEqual(r.preferred_score, r.score_fcf)
         self.assertFalse(r.passes)
+
+    def test_neocloud_capex_is_not_double_counted(self):
+        r = metrics.rule40_report(
+            revenue_growth=120, ebitda_margin=30, fcf_margin=-20,
+            capex_intensity=80,
+        )
+        self.assertEqual(r.score_fcf, 100.0)
+        self.assertEqual(r.capex_adjusted_score, 70.0)
+        self.assertEqual(r.preferred_score, 100.0)
+        self.assertFalse(r.passes)  # negative FCF margin cannot receive a green pass
 
     def test_mature_saas_uses_fcf_and_mature_bar(self):
         r = metrics.rule40_report(revenue_growth=18, ebitda_margin=35, fcf_margin=30)
@@ -54,21 +64,49 @@ class TestRule40(unittest.TestCase):
         r = metrics.rule40_report(revenue_growth=25, ebitda_margin=10, fcf_margin=8, sector_key="cybersecurity")
         self.assertEqual(r.benchmark, metrics.SECTOR_BENCHMARKS["cybersecurity"])
 
+    def test_missing_optional_inputs_are_not_imputed_as_zero(self):
+        r = metrics.rule40_report(revenue_growth=25, ebitda_margin=10, fcf_margin=8)
+        self.assertIsNone(r.capex_intensity)
+        self.assertIsNone(r.capex_adjusted_score)
+        self.assertIsNone(r.dilution_adjusted_score)
+
 
 class TestValuation(unittest.TestCase):
     def test_dcf_monotonic_in_growth(self):
-        low = metrics.dcf_intrinsic_value(1_000_000, growth_rate=5, shares_outstanding=1_000_000)
-        high = metrics.dcf_intrinsic_value(1_000_000, growth_rate=15, shares_outstanding=1_000_000)
+        assumptions = {
+            "discount_rate": 10.0, "terminal_growth": 3.0, "years": 10,
+            "net_debt": 0.0, "shares_outstanding": 1_000_000,
+        }
+        low = metrics.dcf_intrinsic_value(1_000_000, growth_rate=5, **assumptions)
+        high = metrics.dcf_intrinsic_value(1_000_000, growth_rate=15, **assumptions)
         self.assertGreater(high["per_share"], low["per_share"])
 
     def test_dcf_rejects_terminal_ge_discount(self):
         with self.assertRaises(ValueError):
-            metrics.dcf_intrinsic_value(1_000_000, growth_rate=10, discount_rate=5, terminal_growth=6)
+            metrics.dcf_intrinsic_value(
+                1_000_000, growth_rate=10, discount_rate=5,
+                terminal_growth=6, years=10, net_debt=0,
+            )
 
     def test_dcf_net_debt_reduces_equity(self):
-        no_debt = metrics.dcf_intrinsic_value(1_000_000, 8, shares_outstanding=1000, net_debt=0)
-        with_debt = metrics.dcf_intrinsic_value(1_000_000, 8, shares_outstanding=1000, net_debt=5_000_000)
+        assumptions = {
+            "discount_rate": 10.0, "terminal_growth": 3.0,
+            "years": 10, "shares_outstanding": 1000,
+        }
+        no_debt = metrics.dcf_intrinsic_value(1_000_000, 8, net_debt=0, **assumptions)
+        with_debt = metrics.dcf_intrinsic_value(
+            1_000_000, 8, net_debt=5_000_000, **assumptions
+        )
         self.assertGreater(no_debt["per_share"], with_debt["per_share"])
+
+    def test_dcf_requires_assumptions_and_positive_fcf(self):
+        with self.assertRaises(TypeError):
+            metrics.dcf_intrinsic_value(1_000_000, 8)
+        with self.assertRaises(ValueError):
+            metrics.dcf_intrinsic_value(
+                -1.0, 8, discount_rate=10, terminal_growth=3,
+                years=10, net_debt=0,
+            )
 
 
 class TestHealth(unittest.TestCase):

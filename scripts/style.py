@@ -45,7 +45,7 @@ def style_focus(style: str, payload: dict[str, Any]) -> list[str]:
         )
         if rule.get("preferred_score") is not None:
             lines.append(
-                f"  Preferred Rule of 40: {rule['preferred_score']:.0f} vs bar {rule.get('benchmark')}"
+                f"  Preferred Rule of 40: {rule['preferred_score']:.0f} vs project heuristic {rule.get('benchmark')}"
             )
 
     elif style == "growth":
@@ -62,7 +62,7 @@ def style_focus(style: str, payload: dict[str, Any]) -> list[str]:
         if rule.get("preferred_score") is not None:
             verdict = "PASS" if rule.get("passes") else "BELOW BAR"
             lines.append(
-                f"  Rule of 40 preferred {rule['preferred_score']:.0f} vs {rule.get('benchmark')} → {verdict}"
+                f"  Rule of 40 preferred {rule['preferred_score']:.0f} vs project heuristic {rule.get('benchmark')} → {verdict}"
             )
         lines.append(f"  FCF margin: {d_sol.get('fcf_margin_pct')}%")
         lines.append(f"  Dilution: {d_sol.get('share_dilution_pct')}%")

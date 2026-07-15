@@ -9,4 +9,4 @@ Kept intentionally light: importing the package must not require yfinance or the
 network. Submodules pull their dependencies in lazily when actually used.
 """
 
-__version__ = "0.12.0"
+__version__ = "0.13.0"

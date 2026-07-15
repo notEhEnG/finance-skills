@@ -19,12 +19,12 @@ the build rather than relying on prose:
 - **Untrusted input is parsed, not evaluated.** The `screen` rule language is a
   tiny hand-written parser (`field op value`) that validates the whole rule up
   front; adversarial inputs (e.g. `__import__('os')`) raise, covered by tests.
-- **The one write surface is traversal-guarded.** A ticker is interpolated into a
-  cache filename, so it's untrusted input. It's validated against a strict symbol
-  pattern (`_normalize_ticker`) and the cache path is refused if it would resolve
-  outside the cache directory — so `../evil` can't escape. Regression-tested.
+- **Local writes are non-overwriting.** Cache and watchlist updates create
+  append-only snapshots; exports use exclusive creation and refuse an existing
+  path; the installer refuses a populated destination. Cache tickers are validated
+  against a strict symbol pattern and cannot escape the cache directory.
 - **No secrets.** The package reads public market data only; it stores no
-  credentials and writes only local files (a 6h cache and optional watchlists).
+  credentials and writes only local cache/watchlist snapshots or explicit exports.
 
 These checks are a real boundary, not a vocabulary filter: analysis text may say
 "withdraw" or "brokerage" freely — the invariant is on imports and calls, not
@@ -49,9 +49,9 @@ Python process:
 | Bypassing deterministic routing | `route_request()` / `route --json` — no LLM in the default path |
 
 Architectural tests cannot force an LLM to obey prose. Agent compliance is
-specified in `SKILL.md` and checked where possible via routing/schema unit tests.
-A full transcript harness is planned; until then, treat agent policy as
-**mandatory specification**, not optional guidance.
+specified in `SKILL.md`; the mocked transcript harness checks hard-fail,
+usefulness, and synthesis rules. These deterministic checks are policy lint—not
+proof that upstream data or a model's financial judgment is correct.
 
 ## Supported versions
 

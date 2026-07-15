@@ -80,6 +80,7 @@ class TestScreen(unittest.TestCase):
         res = screen.screen("gross_margin > 50", ["CRWV", "NBIS"], use_fixture=True)
         matched = {m["ticker"] for m in res["matches"]}
         self.assertEqual(matched, {"CRWV"})
+        self.assertEqual(len(res["engine_reports"]), 2)
 
     def test_no_data_ticker_marked(self):
         res = screen.screen("gross_margin > 0", ["ZZZZ"], use_fixture=True)
@@ -99,4 +100,3 @@ class TestScreen(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

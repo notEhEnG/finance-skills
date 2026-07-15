@@ -44,7 +44,7 @@ class TestEngineReportEnvelope(unittest.TestCase):
         self.assertEqual(dcf_metrics[0]["status"], "disabled")
         self.assertIsNone(dcf_metrics[0]["value"])
 
-    def test_positive_fcf_enables_dcf_calculation(self):
+    def test_positive_fcf_still_requires_explicit_dcf_assumptions(self):
         f = Fundamentals(
             ticker="Y", available=True, source="yfinance",
             revenue=300e6, revenue_prior=100e6,
@@ -53,11 +53,22 @@ class TestEngineReportEnvelope(unittest.TestCase):
             price=50.0, market_cap=500e6, name="Y Co",
         )
         rep = analyze.build_report(f)
-        self.assertIn("dcf", rep)
+        self.assertNotIn("dcf", rep)
         env = report_schema.envelope_from_build_report(rep)
         dcf_m = next(c for c in env["calculations"] if c["name"] == "dcf_per_share")
-        self.assertEqual(dcf_m["status"], "live")
-        self.assertIsNotNone(dcf_m["value"])
+        self.assertEqual(dcf_m["status"], "disabled")
+        self.assertIsNone(dcf_m["value"])
+        self.assertIn("explicit FCF-growth", dcf_m["note"])
+
+    def test_fixture_values_are_not_labelled_live(self):
+        env = report_schema.envelope_from_build_report(
+            analyze.build_report(load_fixture("CRWV"))
+        )
+        revenue = next(m for m in env["source_facts"] if m["name"] == "revenue")
+        self.assertEqual(revenue["status"], "fixture")
+        self.assertEqual(revenue["source"], "fixture")
+        self.assertEqual(revenue["currency"], "USD")
+        self.assertEqual(revenue["period_type"], "sample")
 
     def test_projection_shares_legacy_derived(self):
         f = load_fixture("CRWV")
@@ -93,8 +104,9 @@ class TestAgentPolicyDocs(unittest.TestCase):
         skill = (root / "SKILL.md").read_text(encoding="utf-8")
         policy = (root / "docs" / "agent-policy.md").read_text(encoding="utf-8")
         for needle in (
-            "MUST invoke",
-            "allowed source of numerical",
+            "hard gate",
+            "engine output",
+            "separately attributed",
             "refuse",
             "fixture",
             "buy",

@@ -84,7 +84,7 @@ def _run_compare(tickers: list[str], *, use_fixture: bool) -> dict[str, Any]:
     out = compare.build_compare(reports, as_json=True)
     out["unavailable"] = unavailable
     # Attach a light engine_report from the first available name for draft limits
-    if reports:
+    if reports and "engine_report" not in out:
         out = report_schema.attach_engine_report(
             out, reports[0], intent="compare",
         )

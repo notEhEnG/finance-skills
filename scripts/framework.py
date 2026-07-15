@@ -22,12 +22,13 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 if __package__:
-    from finance_skills import analyze
+    from finance_skills import analyze, report_schema
     from finance_skills.cli import parse_argv
     from finance_skills.data import Fundamentals, load_for_cli
     from finance_skills.format import footer, pct, source_line
 else:
     import analyze
+    import report_schema
     from cli import parse_argv
     from data import Fundamentals, load_for_cli
     from format import footer, pct, source_line
@@ -41,7 +42,7 @@ def _rule40(r):
     x = r.get("rule40")
     if not x:
         return r.get("rule40_note", "n/a — needs growth and both margins.")
-    return (f"judged {x['preferred_score']:.0f} vs {x['benchmark']:.0f} bar → "
+    return (f"judged {x['preferred_score']:.0f} vs {x['benchmark']:.0f} project heuristic → "
             f"{'PASS' if x['passes'] else 'BELOW BAR'} "
             f"(EBITDA {x['score_ebitda']:.0f} / FCF {x['score_fcf']:.0f}, gap {x['capital_intensity_gap']:.0f})")
 
@@ -52,7 +53,8 @@ def _derived(key, fmt=pct):
 
 def _capex_adj(r):
     x = r.get("rule40")
-    return "n/a" if not x else f"{x['capex_adjusted_score']:.0f} (FCF Rule-40 minus capex intensity)"
+    score = (x or {}).get("capex_adjusted_score")
+    return "n/a" if score is None else f"{score:.0f} (EBITDA Rule-40 minus capex intensity proxy)"
 
 
 def _ev_ebitda(r):
@@ -82,8 +84,8 @@ FRAMEWORKS: dict[str, dict] = {
     "neocloud": {
         "title": "AI neocloud / GPU capex",
         "metrics": [
-            ("Rule of 40 (capex-adjusted)", _rule40),
-            ("Capex-adjusted score", _capex_adj),
+            ("Rule of 40 (FCF-based)", _rule40),
+            ("EBITDA-minus-capex proxy", _capex_adj),
             ("Capex intensity", _derived("capex_intensity_pct")),
             ("FCF margin", _derived("fcf_margin_pct")),
             ("Net debt / EBITDA", lambda r: f"{r['leverage']['net_debt_to_ebitda']}x" if "leverage" in r else "n/a"),
@@ -134,7 +136,15 @@ def build_framework(name: str, f: Fundamentals, as_json: bool = False):
             rows.append({"metric": label, "value": src(report), "kpi": None})
 
     if as_json:
-        return {"ticker": report["ticker"], "framework": name, "title": fw["title"], "rows": rows}
+        payload = {
+            "ticker": report["ticker"],
+            "framework": name,
+            "title": fw["title"],
+            "rows": rows,
+        }
+        return report_schema.enrich_report_for_agent(
+            f, report, payload, intent="framework",
+        )
     return _render(report, name, fw["title"], rows)
 
 

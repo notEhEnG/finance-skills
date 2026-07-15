@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -54,7 +54,12 @@ class Fundamentals:
     ticker: str
     available: bool
     source: str = "yfinance"
+    data_state: str = "live"
     as_of: str | None = None
+    retrieved_at: str | None = None
+    currency: str | None = None
+    source_url: str | None = None
+    field_metadata: dict[str, dict[str, str | None]] = field(default_factory=dict)
     error: str | None = None
 
     name: str | None = None
@@ -88,39 +93,120 @@ class Fundamentals:
             return None
         return self.total_debt - self.total_cash
 
+    def currencies_align(self, *names: str) -> bool:
+        """Whether known currencies agree for fields used in one calculation.
+
+        Legacy records without field-level metadata remain usable, but once the
+        provider identifies currencies the engine refuses cross-currency sums.
+        """
+        currencies = {
+            (self.field_metadata.get(name) or {}).get("currency")
+            for name in names
+            if getattr(self, name, None) is not None
+        }
+        currencies.discard(None)
+        return len(currencies) <= 1
+
+    def periods_align(self, *names: str) -> bool:
+        """Whether period-based fields can be used in one calculation.
+
+        Older cache records and hand-built test inputs have no field metadata; in
+        that case compatibility is unknown and the existing fail-closed input
+        checks remain authoritative. When metadata is present, annual and TTM
+        values must not be mixed in the same margin or growth calculation.
+        """
+        kinds = {
+            (self.field_metadata.get(name) or {}).get("period_type")
+            for name in names
+            if getattr(self, name, None) is not None
+        }
+        kinds.discard(None)
+        comparable = {"annual", "ttm", "spot"}
+        relevant = kinds & comparable
+        return len(relevant) <= 1
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _cache_path(ticker: str) -> Path:
+def _cache_path(ticker: str, snapshot: str | None = None) -> Path:
     # Defense-in-depth: even though callers normalize, refuse any path that would
     # resolve outside CACHE_DIR (a second line against traversal on the write surface).
-    path = CACHE_DIR / f"{normalize_ticker(ticker)}.json"
+    suffix = f"-{snapshot}" if snapshot else ""
+    path = CACHE_DIR / f"{normalize_ticker(ticker)}{suffix}.json"
     if path.resolve().parent != CACHE_DIR.resolve():
         raise ValueError(f"cache path escapes CACHE_DIR for ticker {ticker!r}")
     return path
 
 
 def _read_cache(ticker: str) -> Fundamentals | None:
-    path = _cache_path(ticker)
+    ticker = normalize_ticker(ticker)
     try:
-        if not path.is_file():
-            return None
-        if time.time() - path.stat().st_mtime > CACHE_TTL_SECONDS:
-            return None
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return Fundamentals(**data)
+        legacy = _cache_path(ticker)
+        candidates = list(CACHE_DIR.glob(f"{ticker}-*.json"))
+        if legacy.is_file():
+            candidates.append(legacy)
+        for path in sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True):
+            if time.time() - path.stat().st_mtime > CACHE_TTL_SECONDS:
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            cached = Fundamentals(**payload)
+            cached.data_state = "cache"
+            return cached
     except (OSError, ValueError, TypeError):
         return None
+    return None
 
 
 def _write_cache(f: Fundamentals) -> None:
     try:
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        _cache_path(f.ticker).write_text(json.dumps(f.to_dict(), indent=2), encoding="utf-8")
+        # Append-only snapshots: never overwrite a prior observation. The
+        # nanosecond suffix also makes concurrent fetches collision-resistant.
+        path = _cache_path(f.ticker, str(time.time_ns()))
+        with path.open("x", encoding="utf-8") as handle:
+            handle.write(json.dumps(f.to_dict(), indent=2))
     except OSError:
         pass  # caching is best-effort
+
+
+def _period_label(df, column: int = 0) -> str | None:
+    """ISO period end for a statement column, when yfinance supplies one."""
+    try:
+        if df is None or getattr(df, "empty", True) or df.shape[1] <= column:
+            return None
+        value = df.columns[column]
+        if hasattr(value, "date"):
+            return value.date().isoformat()
+        return str(value)
+    except Exception:
+        return None
+
+
+def _pick_value(
+    statement_value: float | None,
+    info_value: float | None,
+    *,
+    statement_name: str,
+    statement_period: str | None,
+    currency: str | None,
+    fallback_period_type: str = "ttm",
+) -> tuple[float | None, dict[str, str | None]]:
+    """Choose a value without treating a reported zero as missing."""
+    if statement_value is not None:
+        return statement_value, {
+            "source": statement_name,
+            "period_end": statement_period,
+            "period_type": "annual",
+            "currency": currency,
+        }
+    return info_value, {
+        "source": "yfinance.info",
+        "period_end": None,
+        "period_type": fallback_period_type,
+        "currency": currency,
+    }
 
 
 def _order_latest_first(df):
@@ -216,27 +302,105 @@ def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
         cash = _order_latest_first(_safe_stmt(t, "cashflow"))
         balance = _order_latest_first(_safe_stmt(t, "balance_sheet"))
 
+        currency = info.get("financialCurrency") or info.get("currency")
+        income_period = _period_label(income)
+        income_prior_period = _period_label(income, 1)
+        cash_period = _period_label(cash)
+        balance_period = _period_label(balance)
+
+        revenue, revenue_meta = _pick_value(
+            _col(income, ["Total Revenue", "TotalRevenue"], 0),
+            _num(info.get("totalRevenue")),
+            statement_name="income_statement",
+            statement_period=income_period,
+            currency=currency,
+        )
+        gross_profit, gross_meta = _pick_value(
+            _first(income, ["Gross Profit", "GrossProfit"]),
+            _num(info.get("grossProfits")),
+            statement_name="income_statement",
+            statement_period=income_period,
+            currency=currency,
+        )
+        ebitda, ebitda_meta = _pick_value(
+            _first(income, ["EBITDA", "Normalized EBITDA"]),
+            _num(info.get("ebitda")),
+            statement_name="income_statement",
+            statement_period=income_period,
+            currency=currency,
+        )
+        free_cash_flow, fcf_meta = _pick_value(
+            _first(cash, ["Free Cash Flow", "FreeCashFlow"]),
+            _num(info.get("freeCashflow")),
+            statement_name="cash_flow_statement",
+            statement_period=cash_period,
+            currency=currency,
+        )
+        net_income, net_income_meta = _pick_value(
+            _first(income, ["Net Income", "NetIncome"]),
+            _num(info.get("netIncomeToCommon")),
+            statement_name="income_statement",
+            statement_period=income_period,
+            currency=currency,
+        )
+        total_debt, debt_meta = _pick_value(
+            _first(balance, ["Total Debt", "TotalDebt"]),
+            _num(info.get("totalDebt")),
+            statement_name="balance_sheet",
+            statement_period=balance_period,
+            currency=currency,
+            fallback_period_type="point_in_time",
+        )
+        total_cash, cash_meta = _pick_value(
+            _first(balance, ["Cash And Cash Equivalents"]),
+            _num(info.get("totalCash")),
+            statement_name="balance_sheet",
+            statement_period=balance_period,
+            currency=currency,
+            fallback_period_type="point_in_time",
+        )
         capex_raw = _first(cash, ["Capital Expenditure", "CapitalExpenditures"])
+        prior_revenue = _col(income, ["Total Revenue", "TotalRevenue"], 1)
+        retrieved_at = _now_iso()
         f = Fundamentals(
             ticker=ticker,
             available=True,
-            as_of=_now_iso(),
+            data_state="live",
+            as_of=income_period or cash_period or balance_period,
+            retrieved_at=retrieved_at,
+            currency=currency,
+            source_url=f"https://finance.yahoo.com/quote/{ticker}/financials/",
             name=info.get("longName") or info.get("shortName"),
             sector=info.get("sector"),
             industry=info.get("industry"),
-            price=_num(info.get("currentPrice") or info.get("regularMarketPrice")),
+            price=_num(info.get("currentPrice")) if info.get("currentPrice") is not None else _num(info.get("regularMarketPrice")),
             market_cap=_num(info.get("marketCap")),
-            revenue=_col(income, ["Total Revenue", "TotalRevenue"], 0) or _num(info.get("totalRevenue")),
-            revenue_prior=_col(income, ["Total Revenue", "TotalRevenue"], 1),
-            gross_profit=_first(income, ["Gross Profit", "GrossProfit"]) or _num(info.get("grossProfits")),
-            ebitda=_first(income, ["EBITDA", "Normalized EBITDA"]) or _num(info.get("ebitda")),
-            free_cash_flow=_first(cash, ["Free Cash Flow", "FreeCashFlow"]) or _num(info.get("freeCashflow")),
+            revenue=revenue,
+            revenue_prior=prior_revenue,
+            gross_profit=gross_profit,
+            ebitda=ebitda,
+            free_cash_flow=free_cash_flow,
             capex=abs(capex_raw) if capex_raw is not None else None,
-            net_income=_first(income, ["Net Income", "NetIncome"]) or _num(info.get("netIncomeToCommon")),
-            total_debt=_num(info.get("totalDebt")) or _first(balance, ["Total Debt", "TotalDebt"]),
-            total_cash=_num(info.get("totalCash")) or _first(balance, ["Cash And Cash Equivalents"]),
+            net_income=net_income,
+            total_debt=total_debt,
+            total_cash=total_cash,
             shares_outstanding=_num(info.get("sharesOutstanding")),
             shares_prior=_col(balance, ["Share Issued", "Ordinary Shares Number"], 1),
+            field_metadata={
+                "price": {"source": "yfinance.info", "period_end": retrieved_at, "period_type": "spot", "currency": info.get("currency")},
+                "market_cap": {"source": "yfinance.info", "period_end": retrieved_at, "period_type": "spot", "currency": info.get("currency")},
+                "revenue": revenue_meta,
+                "revenue_prior": {"source": "income_statement", "period_end": income_prior_period, "period_type": "annual", "currency": currency},
+                "gross_profit": gross_meta,
+                "ebitda": ebitda_meta,
+                "free_cash_flow": fcf_meta,
+                "capex": {"source": "cash_flow_statement", "period_end": cash_period, "period_type": "annual", "currency": currency},
+                "net_income": net_income_meta,
+                "total_debt": debt_meta,
+                "total_cash": cash_meta,
+                "shares_outstanding": {"source": "yfinance.info", "period_end": retrieved_at, "period_type": "spot", "currency": "shares"},
+                "shares_prior": {"source": "balance_sheet", "period_end": _period_label(balance, 1), "period_type": "annual", "currency": "shares"},
+            },
         )
 
         # Fall back to yfinance's own revenueGrowth (fraction) if we lack a prior year.
@@ -244,6 +408,25 @@ def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
             rg = info.get("revenueGrowth")
             if isinstance(rg, (int, float)) and rg not in (0, None) and rg > -1:
                 f.revenue_prior = f.revenue / (1 + rg)
+                f.field_metadata["revenue_prior"] = {
+                    "source": "yfinance.info.revenueGrowth",
+                    "period_end": None,
+                    "period_type": "ttm",
+                    "currency": currency,
+                }
+
+        if not any(
+            value is not None
+            for value in (f.price, f.market_cap, f.revenue, f.ebitda, f.free_cash_flow)
+        ):
+            return Fundamentals(
+                ticker=ticker,
+                available=False,
+                source="yfinance",
+                data_state="unavailable",
+                retrieved_at=retrieved_at,
+                error="yfinance returned no usable market or financial fields",
+            )
 
         _write_cache(f)
         return f
@@ -274,7 +457,8 @@ def _num(value):
 
 _FIXTURES = {
     "CRWV": Fundamentals(
-        ticker="CRWV", available=True, source="fixture", as_of="2026-Q1",
+        ticker="CRWV", available=True, source="fixture", data_state="fixture", as_of="2026-Q1",
+        currency="USD", source_url=None,
         name="CoreWeave, Inc.", sector="Technology", industry="Information Technology Services",
         price=100.0, market_cap=48_000_000_000,
         revenue=1_900_000_000, revenue_prior=900_000_000,   # ~112% YoY
@@ -285,7 +469,8 @@ _FIXTURES = {
         shares_outstanding=480_000_000, shares_prior=440_000_000,
     ),
     "NBIS": Fundamentals(
-        ticker="NBIS", available=True, source="fixture", as_of="2026-Q1",
+        ticker="NBIS", available=True, source="fixture", data_state="fixture", as_of="2026-Q1",
+        currency="USD", source_url=None,
         name="Nebius Group N.V.", sector="Technology", industry="Information Technology Services",
         price=45.0, market_cap=10_000_000_000,
         revenue=1_577_000_000, revenue_prior=201_000_000,   # ~684% YoY
@@ -325,7 +510,7 @@ def get_fundamentals_or_fixture(ticker: str, use_cache: bool = True) -> Fundamen
 
 
 def load_for_cli(ticker: str, *, use_fixture: bool = False) -> Fundamentals:
-    """Validate ticker then load fixture or live/fixture-fallback. Never raises."""
+    """Validate ticker, then load explicitly requested fixture or live data."""
     try:
         t = normalize_ticker(ticker)
     except ValueError as exc:
@@ -334,4 +519,4 @@ def load_for_cli(ticker: str, *, use_fixture: bool = False) -> Fundamentals:
         return load_fixture(t) or Fundamentals(
             ticker=t, available=False, error="no fixture for this ticker"
         )
-    return get_fundamentals_or_fixture(t)
+    return get_fundamentals(t)

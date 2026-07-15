@@ -7,7 +7,7 @@
 #   ./install.sh [claude|antigravity|codex|all] [--dir TARGET_PROJECT]
 #
 # Run from a clone, or pipe from GitHub:
-#   curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/main/install.sh | bash -s -- claude
+#   curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/v0.13.0/install.sh | bash -s -- claude
 #
 # It copies the skill (SKILL.md + scripts + references) into the tool's skill
 # directory under the target project, so /finance-skills can run the engine.
@@ -15,6 +15,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/notEhEnG/finance-skills.git"
+REPO_REF="${FINANCE_SKILLS_REF:-v0.13.0}"
 TOOL="claude"
 TARGET_DIR="$PWD"
 
@@ -28,34 +29,29 @@ while [ $# -gt 0 ]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd || true)"
-CLEANUP=""
+RETAINED_CLONE=""
 if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/SKILL.md" ] && [ -f "$SCRIPT_DIR/scripts/analyze.py" ]; then
   SRC="$SCRIPT_DIR"
 else
-  echo "Cloning $REPO_URL ..."
-  SRC="$(mktemp -d)"; CLEANUP="$SRC"
-  git clone --depth 1 "$REPO_URL" "$SRC" >/dev/null 2>&1
+  echo "Cloning $REPO_URL at $REPO_REF ..."
+  SRC="$(mktemp -d)"; RETAINED_CLONE="$SRC"
+  git clone --depth 1 --branch "$REPO_REF" "$REPO_URL" "$SRC" >/dev/null 2>&1
 fi
 
 copy_into() {
-  local dest="$1"; mkdir -p "$dest"
-  if command -v rsync >/dev/null 2>&1; then
-    rsync -a \
-      --exclude '.git' --exclude '.cache' --exclude '__pycache__' --exclude '*.pyc' \
-      --exclude '.pytest_cache' --exclude 'overview*.md' --exclude '*-cli.txt' --exclude 'Gap-*.csv' \
-      --exclude '.claude' --exclude '.antigravity' --exclude '.codex' \
-      --exclude 'dist' --exclude 'build' --exclude '*.egg-info' --exclude '.venv' --exclude 'venv' \
-      "$SRC"/ "$dest"/
-  else
-    cp -R "$SRC"/. "$dest"/
-    rm -rf "$dest/.git" "$dest/.cache" "$dest/.pytest_cache" \
-      "$dest/.claude" "$dest/.antigravity" "$dest/.codex" \
-      "$dest/dist" "$dest/build" "$dest/.venv" "$dest/venv"
-    rm -rf "$dest"/*.egg-info
-    rm -f "$dest"/overview*.md "$dest"/*-cli.txt "$dest"/Gap-*.csv
-    find "$dest" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
-    find "$dest" -name '*.pyc' -delete 2>/dev/null || true
+  local dest="$1"
+  if [ -d "$dest" ] && [ -n "$(find "$dest" -mindepth 1 -print -quit 2>/dev/null)" ]; then
+    echo "Refusing to overwrite existing skill directory: $dest" >&2
+    echo "Install into a new project/path or preserve the existing directory manually." >&2
+    return 1
   fi
+  mkdir -p "$dest"
+  cp -n "$SRC/SKILL.md" "$SRC/README.md" "$SRC/LICENSE" "$SRC/SECURITY.md" "$dest"/
+  mkdir -p "$dest/scripts" "$dest/references" "$dest/docs"
+  cp -n "$SRC/scripts/"*.py "$dest/scripts"/
+  cp -n "$SRC/references/"*.md "$dest/references"/
+  cp -n "$SRC/docs/"*.md "$SRC/docs/"*.json "$SRC/docs/"*.tape \
+    "$SRC/docs/"*.gif "$SRC/docs/"*.mp4 "$dest/docs"/
   echo "  Installed skill at: $dest/SKILL.md"
 }
 
@@ -75,18 +71,20 @@ else
   install_tool "$TOOL"
 fi
 
-# Record installed skill version for doctor / support (before temp clone cleanup)
+# Record installed skill version for doctor / support.
 if [ -f "$SRC/scripts/__init__.py" ]; then
   VER="$(grep -E '^__version__' "$SRC/scripts/__init__.py" | head -1 | cut -d'"' -f2 || true)"
   echo "Skill package version: ${VER:-unknown}"
 fi
 
-[ -n "$CLEANUP" ] && rm -rf "$CLEANUP"
+if [ -n "$RETAINED_CLONE" ]; then
+  echo "Retained downloaded source at: $RETAINED_CLONE"
+fi
 
 cat <<'EOF'
 
 Done. If needed: pip install yfinance
-  (optional CLI) pip install -U finance-skills   # keep in sync with skill scripts
+  (optional CLI) pip install finance-skills==0.13.0
 
 Preferred agent command (one shot → report + evidence floor, then agent synthesis):
   python3 scripts/ask.py --json "is NBIS a buy?"

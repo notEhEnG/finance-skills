@@ -20,16 +20,16 @@ CONCEPTS: dict[str, tuple[str, str, str]] = {
     "rule40": (
         "Rule of 40: a SaaS health check — growth% + profit-margin% should clear ~40.",
         "This skill is segment-aware: it computes both EBITDA-based and FCF-based scores, "
-        "shows the capital-intensity gap between them, and judges against a stage/sector bar "
-        "(not a flat 40).",
+        "shows the broader EBITDA-to-FCF gap between them, and compares against a clearly "
+        "labelled project heuristic (not a peer percentile).",
         "40 is not universal. A neocloud posts a huge EBITDA score that's meaningless — judge "
-        "it on the capex-adjusted burn instead.",
+        "pair it with FCF margin and capex intensity instead.",
     ),
     "dcf": (
         "Discounted cash flow: a company is worth the present value of its future free cash flow.",
         "Two-stage model: grow FCF for N years, discount each year back, add a Gordon terminal "
-        "value, subtract net debt, divide by shares. Here growth is a heuristic (trailing "
-        "revenue growth, capped), discount 10%, terminal 3%.",
+        "value, subtract net debt, divide by shares. The automatic company path disables DCF; "
+        "callers of the pure helper must supply all growth, discount, terminal and horizon assumptions.",
         "Output is only as good as the assumptions — tiny changes in growth/discount swing it "
         "wildly. Treat it as a rough anchor, and note it's skipped when FCF is negative.",
     ),
@@ -75,7 +75,7 @@ CONCEPTS: dict[str, tuple[str, str, str]] = {
     "moat": (
         "Moat: a durable structural advantage that protects returns from competition.",
         "Read it from the fingerprints: high, stable gross/EBITDA margins vs peers, pricing "
-        "power, and low churn. This skill proxies it with margins-vs-benchmark.",
+        "power, and low churn. The engine cannot infer a moat; verify retention, pricing and peer evidence.",
         "Margins alone can be a temporary lead, not a moat — corroborate with switching costs, "
         "network effects, scale, or IP.",
     ),
@@ -99,9 +99,10 @@ CONCEPTS: dict[str, tuple[str, str, str]] = {
         "Capex intensity: capital expenditure as a percent of revenue — how much the business "
         "must spend to grow.",
         "High intensity (neoclouds) means growth is bought with hardware, so EBITDA overstates "
-        "real profitability; the skill subtracts it to get a capex-adjusted score.",
-        "A big gap between EBITDA-based and FCF-based Rule-of-40 is the tell that growth isn't "
-        "organically funded.",
+        "real profitability; the skill shows an EBITDA-minus-capex proxy separately and never "
+        "subtracts capex from FCF twice.",
+        "A big EBITDA-to-FCF gap can include capex, working capital, cash taxes and interest; "
+        "inspect the cash-flow statement before attributing it to one cause.",
     ),
     "altman-z": (
         "Altman Z-Score: a bankruptcy-risk score for public manufacturers.",

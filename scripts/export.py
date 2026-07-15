@@ -93,7 +93,16 @@ def main(argv: list[str]) -> int:
         return 2
 
     if out:
-        Path(out).write_text(rendered, encoding="utf-8")
+        path = Path(out)
+        try:
+            with path.open("x", encoding="utf-8") as handle:
+                handle.write(rendered)
+        except FileExistsError:
+            print(
+                f"Refusing to overwrite existing file: {path}. Choose a new --out path.",
+                file=sys.stderr,
+            )
+            return 2
         print(f"Wrote {verb} report for {f.ticker} → {out} ({fmt}, {len(rendered)} bytes)")
     else:
         print(rendered)

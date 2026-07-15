@@ -77,7 +77,7 @@ def _report_number_whitelist(report: dict[str, Any]) -> set[str]:
 
     walk(report)
     # Always allow common non-metric digits that appear in prose structure
-    for x in ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "10", "40", "100"):
+    for x in ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "10"):
         allowed.add(x)
     return allowed
 
@@ -112,30 +112,26 @@ def hard_fail_checks(
 
     if report is not None:
         allowed = _report_number_whitelist(report)
-        # Flag clearly invented large round "facts" not near any report number
+        # Flag any report-like number that is not an exact report value or a
+        # harmless structural/year token. Cross-unit "close enough" matching can
+        # allow an invented percentage merely because a currency value is nearby.
         for tok in _numbers_in_text(answer):
             raw = tok.rstrip("%")
             try:
                 val = float(raw)
             except ValueError:
                 continue
-            # Skip tiny structural numbers
-            if abs(val) < 15 and "." not in raw:
+            # Skip list counts and calendar years, not analytical metrics.
+            if raw in {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"}:
+                continue
+            if raw == "40" and not tok.endswith("%"):
+                continue  # structural phrase: Rule of 40
+            if 1900 <= val <= 2100 and "." not in raw:
                 continue
             if raw in allowed or f"{val:g}" in allowed:
                 continue
-            # Allow if close to an allowed float
-            ok = False
-            for a in allowed:
-                try:
-                    if abs(float(a) - val) < 0.15 * max(1.0, abs(val)):
-                        ok = True
-                        break
-                except ValueError:
-                    continue
-            if not ok and abs(val) >= 50:
-                fails.append(f"possible_invented_number:{tok}")
-                break
+            fails.append(f"possible_invented_number:{tok}")
+            break
 
     return fails
 

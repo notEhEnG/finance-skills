@@ -2,7 +2,7 @@
 
 Spine (fixed; no second math path):
 
-  identity → regime + dual/preferred Rule of 40 + capital-intensity gap
+  identity → regime + dual/preferred Rule of 40 + EBITDA-to-FCF gap
            → valuation (EV/S, EV/EBITDA, DCF if allowed)
            → solvency (net debt, FCF margin, dilution)
            → top red flags (severity-sorted, max 3)
@@ -30,7 +30,7 @@ if __package__:
     from finance_skills import style as style_mod
     from finance_skills.cli import flag_value, has_flag, run_single_ticker
     from finance_skills.data import Fundamentals
-    from finance_skills.format import DISCLAIMER, fmt_money, footer, mult, pct, source_line
+    from finance_skills.format import DISCLAIMER, currency_for, fmt_money, footer, mult, pct, source_line
 else:
     import analyze
     import diagnostics
@@ -40,7 +40,7 @@ else:
     import style as style_mod
     from cli import flag_value, has_flag, run_single_ticker
     from data import Fundamentals
-    from format import DISCLAIMER, fmt_money, footer, mult, pct, source_line
+    from format import DISCLAIMER, currency_for, fmt_money, footer, mult, pct, source_line
 
 
 def _gaps(r: dict) -> list[dict[str, str]]:
@@ -96,7 +96,12 @@ def build_brief(f: Fundamentals, as_json: bool = False, flags: set[str] | None =
         "ticker": report["ticker"],
         "name": report.get("name"),
         "source": report.get("source"),
+        "data_state": report.get("data_state"),
         "as_of": report.get("as_of"),
+        "retrieved_at": report.get("retrieved_at"),
+        "currency": report.get("currency"),
+        "source_url": report.get("source_url"),
+        "field_metadata": report.get("field_metadata"),
         "sector": report.get("sector"),
         "industry": report.get("industry"),
         "price": report.get("price"),
@@ -155,7 +160,8 @@ def _render(b: dict) -> str:
         f"═══ {b.get('name') or b['ticker']} ({b['ticker']}) — brief ═══",
         source_line(b),
         f"Sector: {b.get('sector') or 'n/a'} / {b.get('industry') or 'n/a'}",
-        f"Price: {fmt_money(b.get('price'))}   Market cap: {fmt_money(b.get('market_cap'))}",
+        f"Price: {fmt_money(b.get('price'), currency_for(b, 'price'))}   "
+        f"Market cap: {fmt_money(b.get('market_cap'), currency_for(b, 'market_cap'))}",
         "",
     ]
 
@@ -169,14 +175,14 @@ def _render(b: dict) -> str:
     if rule and rule.get("preferred_score") is not None:
         verdict = "PASS" if rule.get("passes") else "BELOW BAR"
         out.append(
-            f"Rule of 40: preferred {rule['preferred_score']:.0f} vs bar {rule['benchmark']:.0f} → {verdict}"
+            f"Rule of 40: preferred {rule['preferred_score']:.0f} vs project heuristic {rule['benchmark']:.0f} → {verdict}"
         )
         out.append(
             f"  EBITDA-based {rule['score_ebitda']:.0f} · FCF-based {rule['score_fcf']:.0f} · "
-            f"capital-intensity gap {rule['capital_intensity_gap']:.0f}"
+            f"EBITDA-to-FCF gap {rule['capital_intensity_gap']:.0f}"
         )
         if rule.get("capex_adjusted_score") is not None:
-            out.append(f"  Capex-adjusted {rule['capex_adjusted_score']:.0f}")
+            out.append(f"  EBITDA-minus-capex proxy {rule['capex_adjusted_score']:.0f}")
         if rule.get("verdict"):
             out.append(f"  {rule['verdict']}")
     elif rule and rule.get("note"):
@@ -190,14 +196,14 @@ def _render(b: dict) -> str:
     out.append(f"  EV / Sales:   {mult(v.get('ev_sales'))}")
     out.append(f"  EV / EBITDA:  {mult(v.get('ev_ebitda'))}")
     if v.get("dcf_per_share") is not None:
-        out.append(f"  DCF / share:  {fmt_money(v.get('dcf_per_share'))}  (heuristic)")
+        out.append(f"  DCF / share:  {fmt_money(v.get('dcf_per_share'), currency_for(b))}  (heuristic)")
         sc = (v.get("dcf_scenarios") or {}).get("growth") or {}
         if sc:
             bits = []
             for name in ("bear", "base", "bull"):
                 row = sc.get(name)
                 if row and row.get("per_share") is not None:
-                    bits.append(f"{name} {fmt_money(row['per_share'])}")
+                    bits.append(f"{name} {fmt_money(row['per_share'], currency_for(b))}")
             if bits:
                 out.append(f"  DCF scenarios: {' · '.join(bits)}")
     else:
@@ -210,7 +216,7 @@ def _render(b: dict) -> str:
     out.append(f"  FCF margin:     {pct(s.get('fcf_margin_pct'))}")
     out.append(f"  Capex intensity: {pct(s.get('capex_intensity_pct'))}")
     out.append(f"  Dilution:       {pct(s.get('share_dilution_pct'))}")
-    out.append(f"  Net debt:       {fmt_money(s.get('net_debt'))}")
+    out.append(f"  Net debt:       {fmt_money(s.get('net_debt'), currency_for(b))}")
     lev = s.get("net_debt_to_ebitda")
     if lev is not None:
         if lev < 0:
