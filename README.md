@@ -46,6 +46,43 @@ Plus: **no paid API key** (free yfinance layer + explicit offline fixtures), por
 
 ---
 
+## Persistent research workspace
+
+The primary `/finance` workflow adds persistent context, normalized evidence,
+detectors, explicit scenarios, and immutable thesis tracking while preserving
+`/finance-skills` compatibility:
+
+```bash
+python3 -m finance_skills context --format json
+python3 -m finance_skills context init --format json
+python3 -m finance_skills screen --ticker NVDA --format json
+python3 -m finance_skills underwrite --ticker NVDA --format json
+python3 -m finance_skills audit --ticker NVDA --format json
+python3 -m finance_skills compare --tickers NVDA AMD --format json
+python3 -m finance_skills screen --ticker NVDA --include-estimates --format json
+python3 -m finance_skills snapshot create --ticker NVDA --format json
+python3 -m finance_skills diff --ticker NVDA --format json
+```
+
+`context init` creates `RESEARCH.md` and `.finance/config.json` with
+non-sensitive defaults. Existing files are reported as `preserved` and are not
+overwritten. The source skill and focused workflow references live under
+[`skill/`](skill/).
+
+All redesigned values carry definition, period, currency, source, confidence,
+and data-mode metadata. Derived metrics expose formulas and observation paths.
+Snapshots are immutable, duplicate-safe, and refresh creates a reviewable thesis
+proposal rather than silently rewriting the saved thesis.
+
+Live filing reconciliation is enabled when `FINANCE_SEC_USER_AGENT` contains an
+SEC-compliant contact string such as `finance-skills analyst@example.com`.
+Company IR observations may be supplied in the project-local provider file
+documented in [`docs/redesign-contract.md`](docs/redesign-contract.md).
+Consensus estimates are always explicit opt-in and stay separate from reported
+historical evidence.
+
+---
+
 ## The failure mode (exact)
 
 | Without skill | With skill |
@@ -173,6 +210,19 @@ finance-skills brief CRWV --fixture
 ## Slash commands
 
 ```text
+/finance
+/finance init
+/finance screen NVDA
+/finance underwrite NVDA
+/finance audit NVDA
+/finance compare AMD NVDA
+/finance challenge NVDA
+/finance stress NVDA
+/finance track NVDA
+/finance refresh NVDA
+/finance explain free cash flow
+
+# Compatibility namespace
 /finance-skills is NVDA overvalued?
 /finance-skills is PLTR a value trap?
 /finance-skills brief CRWV
@@ -240,6 +290,10 @@ data or financial methodology against filings.
 
 **Shipped**
 
+- ✅ 0.14.0 — `/finance` persistent research workspace, normalized evidence
+  contract, 29 deterministic detectors, SEC Company Facts normalization,
+  underwrite/audit/challenge/stress workflows, immutable snapshots, material
+  diffs, thesis proposals, exact CLI permissions, and generated agent adapters
 - ✅ 0.13.0 — provenance + period alignment, no capex double-counting, explicit-assumption DCF boundary, contract-complete framework/compare/screen JSON, safer routing/eval/install/export persistence
 - ✅ 0.8.x — one-shot `ask` path, table/emoji multi-ticker output, hardened error handling
 - ✅ 0.9.0 — **analyst-layer contract**: fact layer → analyst layer, §4a conditional thesis, `respond_with_synthesis`

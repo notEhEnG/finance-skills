@@ -9,9 +9,11 @@ the build rather than relying on prose:
 - **It never trades.** No brokerage or trading SDK (Alpaca, IBKR, ccxt, …) is
   imported by any module, and there is no order/withdraw code path. The test
   fails the build on any broker-SDK import.
-- **One network boundary.** All outbound I/O lives in `scripts/data.py` (a
-  read-only `yfinance` fetch). No other module may import a networking client
-  (`requests`, `httpx`, `aiohttp`, `urllib3`, `yfinance`) — checked per module.
+- **Allowlisted provider boundaries.** Outbound I/O lives only in
+  `scripts/data.py` (read-only yfinance) and `scripts/providers.py` (the fixed
+  SEC Company Facts endpoint). No other module may import a networking client
+  (`requests`, `httpx`, `aiohttp`, `urllib`, `urllib3`, `yfinance`) — checked
+  per module.
 - **No dynamic execution or shell-out.** No `eval`/`exec`, no `subprocess`
   import, and no `os.system` anywhere — the escape hatches a keyword scan misses.
 - **The math engine is pure and offline.** Importing `scripts/metrics.py` pulls
@@ -25,6 +27,34 @@ the build rather than relying on prose:
   against a strict symbol pattern and cannot escape the cache directory.
 - **No secrets.** The package reads public market data only; it stores no
   credentials and writes only local cache/watchlist snapshots or explicit exports.
+
+## Redesigned `/finance` boundary
+
+The primary workflow uses only exact commands:
+
+```text
+python3 -m finance_skills context
+python3 -m finance_skills screen
+python3 -m finance_skills underwrite
+python3 -m finance_skills audit
+python3 -m finance_skills compare
+python3 -m finance_skills stress
+python3 -m finance_skills snapshot
+python3 -m finance_skills diff
+python3 -m finance_skills explain
+python3 -m finance_skills doctor
+```
+
+Arbitrary `python` and `python3` permissions are not granted. Redesigned
+read-only workflows may read an existing provider cache but do not write it.
+Only context initialization, snapshot/track, and diff/refresh write research
+state, and those writes are exclusive creation or append-only logs. Symlink and
+path traversal checks prevent state from escaping the discovered project root.
+
+SEC requests are limited to the fixed company-ticker and Company Facts
+endpoints. Investor-relations source references are never fetched; only
+project-local structured observations are read. Estimates are disabled by
+default and cannot replace filing or historical market-data observations.
 
 These checks are a real boundary, not a vocabulary filter: analysis text may say
 "withdraw" or "brokerage" freely — the invariant is on imports and calls, not

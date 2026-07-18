@@ -1,0 +1,15 @@
+{
+  "snapshot_id": "NVDA-2026-01-01-FY2026-Q1",
+  "schema_version": "1.0",
+  "ticker": "NVDA",
+  "created_at": "2026-01-01T00:00:00Z",
+  "data_as_of": "2025-12-31",
+  "period_label": "FY2026-Q1",
+  "data_mode": "fixture",
+  "report": {},
+  "report_hash": "sha256:fixture",
+  "source_summary": {},
+  "warnings": [
+    "Fixture data"
+  ]
+}

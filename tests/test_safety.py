@@ -22,11 +22,11 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-# The single module allowed to reach the network.
-NETWORK_SHELL = "data.py"
+# The only modules allowed to reach the network.
+NETWORK_SHELLS = {"data.py", "providers.py"}
 # Third-party networking clients (not stdlib generics like `http`/`socket`, which
 # have innocent non-network uses and would false-positive).
-NETWORK_CLIENTS = {"yfinance", "requests", "httpx", "aiohttp", "urllib3"}
+NETWORK_CLIENTS = {"yfinance", "requests", "httpx", "aiohttp", "urllib", "urllib3"}
 # Brokerage / trading SDKs — must not be imported by ANY module.
 BROKER_SDKS = {"alpaca", "alpaca_trade_api", "ib_insync", "ibapi", "ccxt",
                "robin_stocks", "tda", "schwab", "kiteconnect"}
@@ -51,12 +51,16 @@ class TestReadOnlyArchitecture(unittest.TestCase):
     def test_network_clients_only_in_the_data_shell(self):
         offenders = {}
         for path in _py_files():
-            if path.name == NETWORK_SHELL:
+            if path.name in NETWORK_SHELLS:
                 continue
             hits = _top_level_imports(ast.parse(path.read_text("utf-8"))) & NETWORK_CLIENTS
             if hits:
                 offenders[path.name] = sorted(hits)
-        self.assertEqual(offenders, {}, f"network client imported outside {NETWORK_SHELL}: {offenders}")
+        self.assertEqual(
+            offenders,
+            {},
+            f"network client imported outside {sorted(NETWORK_SHELLS)}: {offenders}",
+        )
 
     def test_no_broker_or_trading_sdk_anywhere(self):
         offenders = {}

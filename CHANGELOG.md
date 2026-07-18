@@ -6,6 +6,36 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-07-18
+
+### Added
+- Primary `/finance` namespace with focused init, screen, underwrite, audit,
+  compare, challenge, stress, track, refresh, and explain workflows.
+- Evidence Report 2.0 with normalized observations, formula/input-path derived
+  metrics, typed failures, explicit data modes, and claim-grounding utilities.
+- All 29 stable detector IDs from the redesign specification, with structured
+  severity, confidence, evidence, benign explanations, and remediation.
+- SEC Company Facts and explicit-assumption adapters, source reconciliation, and
+  confidence statistics.
+- Immutable, duplicate-safe snapshots; deterministic material diffs; watchpoint
+  updates; refresh logs; and reviewable thesis-update proposals.
+- Source-first Claude, Codex, Cursor, Gemini, and generic distributions with
+  checksums and an SPDX-style package inventory.
+- Priority-ordered provider orchestration with coherent SEC filing cohorts,
+  project-local investor-relations observations, explicit estimate opt-in, and
+  visible value/period/currency reconciliation conflicts.
+- Creation-only external-study manifests, provider command templates, blinded
+  review packets, and validated human-score aggregation. Model evaluation
+  remains explicitly unpublished.
+
+### Security
+- Replaced broad Python skill permissions with exact approved
+  `python3 -m finance_skills <subcommand>` patterns.
+- Redesigned read-only workflows do not write provider cache; only init,
+  snapshot/track, and diff/refresh write project research state.
+- Added adversarial identity, metric/sign, period, currency, causality, hidden
+  assumption, fixture-mode, and disabled-analysis validation.
+
 ## [0.13.0] - 2026-07-15
 
 ### Changed
@@ -310,7 +340,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Verb-first CLI over the shared engine; segment-aware Rule of 40; DCF; EV/EBITDA;
   fail-closed net-debt handling; offline fixtures and tests. See the git history.
 
-[Unreleased]: https://github.com/notEhEnG/finance-skills/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/notEhEnG/finance-skills/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/notEhEnG/finance-skills/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/notEhEnG/finance-skills/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/notEhEnG/finance-skills/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/notEhEnG/finance-skills/compare/v0.10.0...v0.11.0

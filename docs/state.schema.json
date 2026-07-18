@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Finance Skills Snapshot",
+  "type": "object",
+  "required": [
+    "snapshot_id",
+    "schema_version",
+    "ticker",
+    "created_at",
+    "data_mode",
+    "report",
+    "report_hash",
+    "warnings"
+  ],
+  "properties": {
+    "snapshot_id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0"
+    },
+    "ticker": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "data_as_of": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "period_label": {
+      "type": "string"
+    },
+    "data_mode": {
+      "enum": [
+        "live",
+        "cached",
+        "fixture",
+        "user_assumption"
+      ]
+    },
+    "report": {
+      "type": "object"
+    },
+    "report_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "source_summary": {
+      "type": "object"
+    },
+    "warnings": {
+      "type": "array"
+    }
+  }
+}

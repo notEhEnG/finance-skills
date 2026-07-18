@@ -8,6 +8,11 @@
 | `eval.md` | Public 20-prompt bare vs skill eval |
 | `agent-policy.md` | Response templates + bad/good answers |
 | `engine-report.schema.json` | Canonical agent JSON |
+| `evidence-report.schema.json` | Redesigned normalized observation and derived-metric contract |
+| `state.schema.json` | Immutable snapshot schema 1.0 |
+| `redesign-contract.md` | Calculation, state, and fixture compatibility rules |
+| `redesign-eval.md` | Redesign metrics, adversarial suite, and transcript protocol |
+| `../eval/prompts.v0.14.0.json` | Versioned external-study prompt matrix |
 | `SOCIAL.md` | Where (and where not) to post |
 
 ### Regenerate demo GIF with VHS

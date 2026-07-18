@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "default_currency": "EUR",
+  "default_depth": "deep",
+  "source_priority": [
+    "filing",
+    "investor_relations",
+    "market_data"
+  ],
+  "staleness": {
+    "market_price_hours": 24,
+    "fundamentals_days": 120,
+    "tracked_snapshot_days": 30
+  },
+  "materiality": {
+    "percentage_point_change": 2.0,
+    "relative_change_pct": 10.0,
+    "share_count_change_pct": 2.0
+  }
+}

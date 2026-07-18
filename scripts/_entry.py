@@ -17,7 +17,11 @@ else:
 
 
 def run() -> None:
-    raise SystemExit(router.main(sys.argv[1:]))
+    argv = sys.argv[1:]
+    executable = sys.argv[0].rsplit("/", 1)[-1]
+    if not argv and executable != "finance-skills":
+        argv = ["context"]
+    raise SystemExit(router.main(argv))
 
 
 if __name__ == "__main__":

@@ -1,12 +1,18 @@
 import sys
-import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import export
 from data import load_fixture
+
+
+def _workdir():
+    path = Path("/tmp") / f"finance-skills-export-{uuid.uuid4().hex}"
+    path.mkdir()
+    return path
 
 
 class TestExport(unittest.TestCase):
@@ -36,19 +42,18 @@ class TestExport(unittest.TestCase):
             export.export(load_fixture("CRWV"), "valuation", "pdf")
 
     def test_writes_out_file(self):
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "r.md"
-            rc = export.main(["NBIS", "--verb=health", "--format=md", f"--out={path}", "--fixture"])
-            self.assertEqual(rc, 0)
-            self.assertTrue(path.read_text().startswith("# "))
+        path = _workdir() / "r.md"
+        rc = export.main(["NBIS", "--verb=health", "--format=md", f"--out={path}", "--fixture"])
+        self.assertEqual(rc, 0)
+        self.assertTrue(path.read_text().startswith("# "))
 
     def test_refuses_to_overwrite_existing_file(self):
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "existing.md"
-            path.write_text("preserve me", encoding="utf-8")
-            rc = export.main(["NBIS", "--format=md", f"--out={path}", "--fixture"])
-            self.assertEqual(rc, 2)
-            self.assertEqual(path.read_text(encoding="utf-8"), "preserve me")
+        path = _workdir() / "existing.md"
+        with path.open("x", encoding="utf-8") as handle:
+            handle.write("preserve me")
+        rc = export.main(["NBIS", "--format=md", f"--out={path}", "--fixture"])
+        self.assertEqual(rc, 2)
+        self.assertEqual(path.read_text(encoding="utf-8"), "preserve me")
 
 
 if __name__ == "__main__":

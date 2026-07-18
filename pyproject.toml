@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "finance-skills"
-version = "0.13.0"
+version = "0.14.0"
 description = "AI agent financial skill: provenance-aware fundamentals, deterministic screens, explicit-assumption DCF helpers, and fail-closed data gaps."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -29,6 +29,7 @@ Homepage = "https://github.com/notEhEnG/finance-skills"
 Repository = "https://github.com/notEhEnG/finance-skills"
 
 [project.scripts]
+finance = "finance_skills._entry:run"
 finance-skills = "finance_skills._entry:run"
 
 [tool.setuptools]

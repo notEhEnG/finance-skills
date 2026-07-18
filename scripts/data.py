@@ -79,6 +79,18 @@ class Fundamentals:
     total_cash: float | None = None
     shares_outstanding: float | None = None
     shares_prior: float | None = None
+    operating_cash_flow: float | None = None
+    working_capital_change: float | None = None
+    stock_based_compensation: float | None = None
+    acquisition_cash_flow: float | None = None
+    current_assets: float | None = None
+    current_assets_prior: float | None = None
+    current_liabilities: float | None = None
+    current_liabilities_prior: float | None = None
+    interest_expense: float | None = None
+    share_buybacks: float | None = None
+    debt_maturity_profile_available: bool | None = None
+    estimates: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -271,7 +283,13 @@ def _col(df, keys, column=0):
     return None
 
 
-def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
+def get_fundamentals(
+    ticker: str,
+    use_cache: bool = True,
+    *,
+    write_cache: bool = True,
+    include_estimates: bool = False,
+) -> Fundamentals:
     """Fetch and normalise fundamentals for `ticker`. Never raises."""
     try:
         ticker = normalize_ticker(ticker)
@@ -280,7 +298,7 @@ def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
         # the filesystem path builder (path-traversal guard on the write surface).
         return Fundamentals(ticker=ticker.strip().upper(), available=False, error=str(exc))
 
-    if use_cache:
+    if use_cache and not include_estimates:
         cached = _read_cache(ticker)
         if cached is not None:
             return cached
@@ -360,7 +378,66 @@ def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
             fallback_period_type="point_in_time",
         )
         capex_raw = _first(cash, ["Capital Expenditure", "CapitalExpenditures"])
+        operating_cash_flow = _first(
+            cash,
+            ["Operating Cash Flow", "Total Cash From Operating Activities"],
+        )
+        working_capital_change = _first(
+            cash,
+            ["Change In Working Capital", "Change To Working Capital"],
+        )
+        stock_based_compensation = _first(
+            cash,
+            ["Stock Based Compensation", "Stock-Based Compensation"],
+        )
+        acquisition_cash_flow = _first(
+            cash,
+            ["Net Business Purchases", "Investments In Property Plant And Equipment"],
+        )
+        current_assets = _col(balance, ["Current Assets", "Total Current Assets"], 0)
+        current_assets_prior = _col(balance, ["Current Assets", "Total Current Assets"], 1)
+        current_liabilities = _col(
+            balance,
+            ["Current Liabilities", "Total Current Liabilities"],
+            0,
+        )
+        current_liabilities_prior = _col(
+            balance,
+            ["Current Liabilities", "Total Current Liabilities"],
+            1,
+        )
+        interest_expense = _first(
+            income,
+            ["Interest Expense", "Interest Expense Non Operating"],
+        )
+        share_buybacks_raw = _first(
+            cash,
+            ["Repurchase Of Capital Stock", "Repurchase Of Stock"],
+        )
         prior_revenue = _col(income, ["Total Revenue", "TotalRevenue"], 1)
+        estimates: dict[str, float] = {}
+        if include_estimates:
+            earnings_growth = info.get("earningsGrowth")
+            revenue_growth = info.get("revenueGrowth")
+            estimate_fields = {
+                "forward_revenue": info.get("forwardRevenue"),
+                "forward_eps": info.get("forwardEps"),
+                "earnings_growth_estimate_pct": (
+                    earnings_growth * 100
+                    if isinstance(earnings_growth, (int, float))
+                    else None
+                ),
+                "revenue_growth_estimate_pct": (
+                    revenue_growth * 100
+                    if isinstance(revenue_growth, (int, float))
+                    else None
+                ),
+            }
+            estimates = {
+                name: value
+                for name, raw in estimate_fields.items()
+                if (value := _num(raw)) is not None
+            }
         retrieved_at = _now_iso()
         f = Fundamentals(
             ticker=ticker,
@@ -386,6 +463,17 @@ def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
             total_cash=total_cash,
             shares_outstanding=_num(info.get("sharesOutstanding")),
             shares_prior=_col(balance, ["Share Issued", "Ordinary Shares Number"], 1),
+            operating_cash_flow=operating_cash_flow,
+            working_capital_change=working_capital_change,
+            stock_based_compensation=stock_based_compensation,
+            acquisition_cash_flow=acquisition_cash_flow,
+            current_assets=current_assets,
+            current_assets_prior=current_assets_prior,
+            current_liabilities=current_liabilities,
+            current_liabilities_prior=current_liabilities_prior,
+            interest_expense=interest_expense,
+            share_buybacks=abs(share_buybacks_raw) if share_buybacks_raw is not None else None,
+            estimates=estimates,
             field_metadata={
                 "price": {"source": "yfinance.info", "period_end": retrieved_at, "period_type": "spot", "currency": info.get("currency")},
                 "market_cap": {"source": "yfinance.info", "period_end": retrieved_at, "period_type": "spot", "currency": info.get("currency")},
@@ -400,6 +488,16 @@ def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
                 "total_cash": cash_meta,
                 "shares_outstanding": {"source": "yfinance.info", "period_end": retrieved_at, "period_type": "spot", "currency": "shares"},
                 "shares_prior": {"source": "balance_sheet", "period_end": _period_label(balance, 1), "period_type": "annual", "currency": "shares"},
+                "operating_cash_flow": {"source": "cash_flow_statement", "period_end": cash_period, "period_type": "annual", "currency": currency},
+                "working_capital_change": {"source": "cash_flow_statement", "period_end": cash_period, "period_type": "annual", "currency": currency},
+                "stock_based_compensation": {"source": "cash_flow_statement", "period_end": cash_period, "period_type": "annual", "currency": currency},
+                "acquisition_cash_flow": {"source": "cash_flow_statement", "period_end": cash_period, "period_type": "annual", "currency": currency},
+                "current_assets": {"source": "balance_sheet", "period_end": balance_period, "period_type": "point_in_time", "currency": currency},
+                "current_assets_prior": {"source": "balance_sheet", "period_end": _period_label(balance, 1), "period_type": "point_in_time", "currency": currency},
+                "current_liabilities": {"source": "balance_sheet", "period_end": balance_period, "period_type": "point_in_time", "currency": currency},
+                "current_liabilities_prior": {"source": "balance_sheet", "period_end": _period_label(balance, 1), "period_type": "point_in_time", "currency": currency},
+                "interest_expense": {"source": "income_statement", "period_end": income_period, "period_type": "annual", "currency": currency},
+                "share_buybacks": {"source": "cash_flow_statement", "period_end": cash_period, "period_type": "annual", "currency": currency},
             },
         )
 
@@ -428,7 +526,8 @@ def get_fundamentals(ticker: str, use_cache: bool = True) -> Fundamentals:
                 error="yfinance returned no usable market or financial fields",
             )
 
-        _write_cache(f)
+        if write_cache:
+            _write_cache(f)
         return f
     except Exception as exc:
         return Fundamentals(ticker=ticker, available=False, error=f"fetch failed: {exc}")
@@ -467,6 +566,12 @@ _FIXTURES = {
         free_cash_flow=-6_000_000_000, capex=8_800_000_000,  # heavy GPU capex
         net_income=-300_000_000, total_debt=12_900_000_000, total_cash=1_400_000_000,
         shares_outstanding=480_000_000, shares_prior=440_000_000,
+        operating_cash_flow=2_800_000_000, working_capital_change=-900_000_000,
+        stock_based_compensation=650_000_000, acquisition_cash_flow=-250_000_000,
+        current_assets=4_200_000_000, current_assets_prior=2_800_000_000,
+        current_liabilities=6_100_000_000, current_liabilities_prior=3_300_000_000,
+        interest_expense=900_000_000, share_buybacks=0,
+        debt_maturity_profile_available=False,
     ),
     "NBIS": Fundamentals(
         ticker="NBIS", available=True, source="fixture", data_state="fixture", as_of="2026-Q1",
@@ -479,6 +584,12 @@ _FIXTURES = {
         free_cash_flow=-7_300_000_000, capex=8_000_000_000,
         net_income=-400_000_000, total_debt=2_000_000_000, total_cash=3_000_000_000,
         shares_outstanding=235_000_000, shares_prior=210_000_000,
+        operating_cash_flow=700_000_000, working_capital_change=-250_000_000,
+        stock_based_compensation=320_000_000, acquisition_cash_flow=-100_000_000,
+        current_assets=4_500_000_000, current_assets_prior=3_900_000_000,
+        current_liabilities=1_700_000_000, current_liabilities_prior=1_300_000_000,
+        interest_expense=120_000_000, share_buybacks=0,
+        debt_maturity_profile_available=False,
     ),
 }
 
@@ -520,3 +631,29 @@ def load_for_cli(ticker: str, *, use_fixture: bool = False) -> Fundamentals:
             ticker=t, available=False, error="no fixture for this ticker"
         )
     return get_fundamentals(t)
+
+
+def load_for_workflow(
+    ticker: str,
+    *,
+    use_fixture: bool = False,
+    include_estimates: bool = False,
+) -> Fundamentals:
+    """Load evidence for redesigned read-only workflows without writing cache."""
+    try:
+        t = normalize_ticker(ticker)
+    except ValueError as exc:
+        return Fundamentals(ticker=ticker.strip().upper(), available=False, error=str(exc))
+    if use_fixture:
+        return load_fixture(t) or Fundamentals(
+            ticker=t,
+            available=False,
+            data_state="unavailable",
+            error="no fixture for this ticker",
+        )
+    return get_fundamentals(
+        t,
+        use_cache=True,
+        write_cache=False,
+        include_estimates=include_estimates,
+    )

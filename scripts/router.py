@@ -37,6 +37,7 @@ class Verb:
 
 # Single source of truth — derive sets/help/export/watchlist from this.
 VERBS: dict[str, Verb] = {
+    "context":    Verb("context", "core", "context", "Project context"),
     "brief":      Verb("brief", "core", "brief", "Default stack", "build_brief"),
     "company":    Verb("company", "core", "company", "Whole company", "build_company"),
     "analyze":    Verb("analyze", "core", "analyze", "Whole company", "build_report_view"),
@@ -135,7 +136,7 @@ WATCHLIST_VERBS: set[str] = set(BUILDERS)
 def _help_groups() -> dict[str, list[str]]:
     groups: dict[str, list[str]] = {}
     order = [
-        "Default stack", "Whole company", "Is it cheap?", "Is it safe?",
+        "Project context", "Default stack", "Whole company", "Is it cheap?", "Is it safe?",
         "Does it have an edge? (lens)", "How does it compare?", "Learn a concept",
         "Sector frameworks", "Power tools",
     ]
@@ -252,7 +253,12 @@ ROUTE_SCHEMA_VERSION = "1.0.0"
 # Agent-facing intent taxonomy (analyze maps to company-class; still runnable).
 AGENT_INTENTS = frozenset({
     "brief", "valuation", "redflags", "health", "company", "compare", "framework",
-    "screen", "learn", "moat", "help", "refuse", "analyze",
+    "screen", "learn", "moat", "help", "refuse", "analyze", "context",
+})
+
+FINANCE_WORKFLOWS = frozenset({
+    "init", "screen", "underwrite", "audit", "compare", "challenge",
+    "stress", "track", "refresh", "explain",
 })
 
 
@@ -490,6 +496,67 @@ def route_request(text: str) -> RouteResult:
     )
 
 
+def route_finance_request(text: str) -> RouteResult:
+    """Route the redesigned `/finance` namespace without changing legacy routes."""
+    original = text.strip()
+    legacy = route_request(original)
+    if legacy.intent == "refuse":
+        return legacy
+    tickers = extract_tickers(original)
+    lowered = f" {original.lower()} "
+    first = original.split(maxsplit=1)[0].lower() if original else ""
+    if first in FINANCE_WORKFLOWS:
+        intent = first
+        method = "verb"
+        confidence = 0.99
+    elif any(phrase in lowered for phrase in (" deep dive", " underwrite", " full thesis")):
+        intent, method, confidence = "underwrite", "keyword", 0.9
+    elif any(phrase in lowered for phrase in (" audit", " accounting", " verify numbers", " red flag")):
+        intent, method, confidence = "audit", "keyword", 0.9
+    elif any(phrase in lowered for phrase in (" compare", " vs ", " versus ")):
+        intent, method, confidence = "compare", "keyword", 0.9
+    elif any(phrase in lowered for phrase in (" challenge", " roast", " argue against")):
+        intent, method, confidence = "challenge", "keyword", 0.9
+    elif any(phrase in lowered for phrase in (" stress", " scenario", " sensitivity")):
+        intent, method, confidence = "stress", "keyword", 0.9
+    elif any(phrase in lowered for phrase in (" track", " save research")):
+        intent, method, confidence = "track", "keyword", 0.9
+    elif any(phrase in lowered for phrase in (" refresh", " update thesis", " new results")):
+        intent, method, confidence = "refresh", "keyword", 0.9
+    elif any(phrase in lowered for phrase in (" explain", " what is ", " define ")):
+        intent, method, confidence = "explain", "keyword", 0.85
+    elif not original:
+        intent, method, confidence = "init", "context", 0.7
+    else:
+        intent, method, confidence = "screen", "default", 0.75
+
+    needs_clarification = False
+    clarification = None
+    if intent == "compare" and len(tickers) < 2:
+        needs_clarification = True
+        clarification = "Which two or more public tickers should I compare?"
+    elif intent not in {"init", "explain"} and not tickers:
+        needs_clarification = True
+        clarification = "Which public company ticker should I use?"
+    return RouteResult(
+        schema_version="2.0.0",
+        original_query=text,
+        intent=intent,
+        tickers=tickers,
+        confidence=confidence,
+        matched_terms=[first] if method == "verb" else [],
+        ambiguity_flags=["missing_ticker"] if needs_clarification else [],
+        needs_clarification=needs_clarification,
+        clarification_question=clarification,
+        allowed_next_actions=(
+            ["ask_clarification"]
+            if needs_clarification
+            else ["load_context", f"load_reference_{intent}", f"run_{intent}"]
+        ),
+        method=method,
+    )
+
+
 def route(text: str, *, apply_default: bool = True) -> Route:
     """Map natural language to a verb (backward-compatible wrapper).
 
@@ -643,6 +710,13 @@ def format_help() -> str:
         lines.append(f"  {question.ljust(width)}  →  {', '.join(cmds)}")
     lines += [
         "",
+        "Redesigned namespace:",
+        "  finance context --format json",
+        "  finance screen --ticker NVDA --format json",
+        "  finance underwrite --ticker NVDA --format json",
+        "  finance snapshot create --ticker NVDA --format json",
+        "  finance diff --ticker NVDA --format json",
+        "",
         "CLI: finance-skills ask \"is NBIS a buy?\" --fixture",
         "     finance-skills <verb> <TICKER> [--fixture|--json]",
         "     finance-skills NBIS --fixture          # same as brief",
@@ -713,6 +787,22 @@ def main(argv: list[str]) -> int:
         return 0
 
     head = argv[0].lower()
+
+    # Redesigned exact workflow grammar. Legacy screen/compare/explain forms
+    # remain available unless their new named arguments are present.
+    redesigned = {
+        "init", "underwrite", "audit", "challenge", "stress", "track",
+        "refresh", "snapshot", "diff",
+    }
+    uses_redesigned_grammar = (
+        head in redesigned
+        or (head == "screen" and any(arg == "--ticker" or arg.startswith("--ticker=") for arg in argv[1:]))
+        or (head == "compare" and any(arg == "--tickers" or arg.startswith("--tickers=") for arg in argv[1:]))
+        or (head == "explain" and any(arg == "--topic" or arg.startswith("--topic=") for arg in argv[1:]))
+    )
+    if uses_redesigned_grammar:
+        workflow_cli = _load_module("workflow_cli")
+        return int(workflow_cli.main(argv))
 
     # Preferred agent path: one-shot route → engine → answer_draft
     if head in ("ask", "doctor"):

@@ -1,6 +1,6 @@
 import sys
-import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -93,14 +93,14 @@ class TestFixtureFallback(unittest.TestCase):
 
 class TestTickerTraversal(unittest.TestCase):
     def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
+        self._tmp = Path("/tmp") / f"finance-skills-data-{uuid.uuid4().hex}"
+        self._tmp.mkdir()
         self._orig = data.CACHE_DIR
         # A nested cache dir so an escaping path would land in the temp root.
-        data.CACHE_DIR = Path(self._tmp.name) / "cache"
+        data.CACHE_DIR = self._tmp / "cache"
 
     def tearDown(self):
         data.CACHE_DIR = self._orig
-        self._tmp.cleanup()
 
     def test_normalize_accepts_real_symbols(self):
         self.assertEqual(data.normalize_ticker("nvda"), "NVDA")
@@ -122,7 +122,7 @@ class TestTickerTraversal(unittest.TestCase):
         self.assertFalse(f.available)
         self.assertIn("invalid ticker", f.error)
         # Nothing may be written anywhere under the temp root.
-        leaked = list(Path(self._tmp.name).rglob("*.json"))
+        leaked = list(self._tmp.rglob("*.json"))
         self.assertEqual(leaked, [], f"a file escaped the cache dir: {leaked}")
 
     def test_or_fixture_also_rejects_bad_ticker(self):
@@ -132,13 +132,13 @@ class TestTickerTraversal(unittest.TestCase):
 
 class TestCache(unittest.TestCase):
     def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
+        self._tmp = Path("/tmp") / f"finance-skills-cache-{uuid.uuid4().hex}"
+        self._tmp.mkdir()
         self._orig_dir, self._orig_ttl = data.CACHE_DIR, data.CACHE_TTL_SECONDS
-        data.CACHE_DIR = Path(self._tmp.name)
+        data.CACHE_DIR = self._tmp
 
     def tearDown(self):
         data.CACHE_DIR, data.CACHE_TTL_SECONDS = self._orig_dir, self._orig_ttl
-        self._tmp.cleanup()
 
     def _sample(self):
         return data.Fundamentals(ticker="TEST", available=True, revenue=100.0, source="yfinance")

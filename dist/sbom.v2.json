@@ -1,0 +1,358 @@
+{
+  "files": [
+    {
+      "path": "dist/claude/SKILL.md",
+      "sha256": "d72ec94b2cfb4d5112f681b015f354b9238f2b07ffeed07b20c2b160116ca05e"
+    },
+    {
+      "path": "dist/codex/SKILL.md",
+      "sha256": "2a1e6316cb001eb0b56d5cafd4ec15a694312d022838759d0b4ca2aaf9c71baa"
+    },
+    {
+      "path": "dist/cursor/SKILL.md",
+      "sha256": "8ca5c271f77f21a838ea4bf2c6467a91c3a91ff8522ad51be6628f788b1df425"
+    },
+    {
+      "path": "dist/gemini/SKILL.md",
+      "sha256": "537d83d9ef5b6e28e7d97184f0c8adeeb7ab4ece0200276ac323702dc8ed3f86"
+    },
+    {
+      "path": "dist/generic/SKILL.md",
+      "sha256": "23c1f48b16926170fd2187a66e7b016242ff72eeddddedcf043b326455085e37"
+    },
+    {
+      "path": "dist/SHA256SUMS",
+      "sha256": "1935088f892236fd3cb2444586e5dca7316894746bcfb91e640b0b8ee79f9f3e"
+    },
+    {
+      "path": "dist/sbom.json",
+      "sha256": "1722b57d5479238200b1c583f946d6a64d647d13c377843a5181f8aaa18b0606"
+    },
+    {
+      "path": "dist/claude/reference/audit.md",
+      "sha256": "f630dc26b4adadd9a29fa2d6e194cf035054bbe26d4fae7bd67e3cfbe71a7a7d"
+    },
+    {
+      "path": "dist/claude/reference/challenge.md",
+      "sha256": "f845fe8400cd0ff577185878ea273d11fc766f5f21f99ada9ba6b4b2195675d5"
+    },
+    {
+      "path": "dist/claude/reference/compare.md",
+      "sha256": "20eb4b31f083f31db0f0a439d230640db4520cc331b6c946b977f14734939094"
+    },
+    {
+      "path": "dist/claude/reference/explain.md",
+      "sha256": "c8c48290b135fa89d3fa6ea02b92c3822d0d4c5297e32dfcd4c7b47dc39a23de"
+    },
+    {
+      "path": "dist/claude/reference/init.md",
+      "sha256": "0b27d01197ed5ae2185af7e97013f8774803dda68ced1d5b83f9c77e2efc2167"
+    },
+    {
+      "path": "dist/claude/reference/refresh.md",
+      "sha256": "c36aa8c4ee9cd9bf12537d5cba52690528f8ec689f6f41e63e47228d458853bd"
+    },
+    {
+      "path": "dist/claude/reference/screen.md",
+      "sha256": "0b2f4607429ff1eb1677fb1cd404240c1114455e39355755d816dd291d2cd494"
+    },
+    {
+      "path": "dist/claude/reference/stress.md",
+      "sha256": "dc66824957b68479694506db77d259059d0547fc5b655d72af6a7de8952fe91b"
+    },
+    {
+      "path": "dist/claude/reference/track.md",
+      "sha256": "ffc903ad1c465f0f94ba7ca81522253def7a20490a3eeaaeb49a57ee54f9829e"
+    },
+    {
+      "path": "dist/claude/reference/underwrite.md",
+      "sha256": "7be261f57aca4c7e4c9a4f2dab1164f2c3b2550f4f73d3ab041c0eecb38db91f"
+    },
+    {
+      "path": "dist/claude/reference/shared/evidence-policy.md",
+      "sha256": "fc81c277350134c95dd9e4168a4d43f3994aa77b9af3a1321707576ed9c94522"
+    },
+    {
+      "path": "dist/claude/reference/shared/failure-handling.md",
+      "sha256": "0bf580ab1c4c5376a22188a95353e5a2a6a0a710d5883dcc470f83d1887aa58b"
+    },
+    {
+      "path": "dist/claude/reference/shared/response-style.md",
+      "sha256": "77d0f48fe9baa3dc766814462bfadc436c2cc48b9a4c79ce54ca822daaa06b8f"
+    },
+    {
+      "path": "dist/claude/agents/forensic-accountant.md",
+      "sha256": "78fe788ff30a3d82a03229cc617f3cc6a3a3a98024bced182d2b464fa97f1570"
+    },
+    {
+      "path": "dist/claude/agents/fundamental-analyst.md",
+      "sha256": "57154bd93b116aa7fef0eb58f1408e474c13a9891eb9d6aa8b7aab6093a2b552"
+    },
+    {
+      "path": "dist/claude/agents/valuation-skeptic.md",
+      "sha256": "b09aad0c059d9bcd9bbe21f6355c7d51c4392c51880133cfb5a64e2c412bb40b"
+    },
+    {
+      "path": "dist/codex/reference/audit.md",
+      "sha256": "f630dc26b4adadd9a29fa2d6e194cf035054bbe26d4fae7bd67e3cfbe71a7a7d"
+    },
+    {
+      "path": "dist/codex/reference/challenge.md",
+      "sha256": "f845fe8400cd0ff577185878ea273d11fc766f5f21f99ada9ba6b4b2195675d5"
+    },
+    {
+      "path": "dist/codex/reference/compare.md",
+      "sha256": "20eb4b31f083f31db0f0a439d230640db4520cc331b6c946b977f14734939094"
+    },
+    {
+      "path": "dist/codex/reference/explain.md",
+      "sha256": "c8c48290b135fa89d3fa6ea02b92c3822d0d4c5297e32dfcd4c7b47dc39a23de"
+    },
+    {
+      "path": "dist/codex/reference/init.md",
+      "sha256": "0b27d01197ed5ae2185af7e97013f8774803dda68ced1d5b83f9c77e2efc2167"
+    },
+    {
+      "path": "dist/codex/reference/refresh.md",
+      "sha256": "c36aa8c4ee9cd9bf12537d5cba52690528f8ec689f6f41e63e47228d458853bd"
+    },
+    {
+      "path": "dist/codex/reference/screen.md",
+      "sha256": "0b2f4607429ff1eb1677fb1cd404240c1114455e39355755d816dd291d2cd494"
+    },
+    {
+      "path": "dist/codex/reference/stress.md",
+      "sha256": "dc66824957b68479694506db77d259059d0547fc5b655d72af6a7de8952fe91b"
+    },
+    {
+      "path": "dist/codex/reference/track.md",
+      "sha256": "ffc903ad1c465f0f94ba7ca81522253def7a20490a3eeaaeb49a57ee54f9829e"
+    },
+    {
+      "path": "dist/codex/reference/underwrite.md",
+      "sha256": "7be261f57aca4c7e4c9a4f2dab1164f2c3b2550f4f73d3ab041c0eecb38db91f"
+    },
+    {
+      "path": "dist/codex/reference/shared/evidence-policy.md",
+      "sha256": "fc81c277350134c95dd9e4168a4d43f3994aa77b9af3a1321707576ed9c94522"
+    },
+    {
+      "path": "dist/codex/reference/shared/failure-handling.md",
+      "sha256": "0bf580ab1c4c5376a22188a95353e5a2a6a0a710d5883dcc470f83d1887aa58b"
+    },
+    {
+      "path": "dist/codex/reference/shared/response-style.md",
+      "sha256": "77d0f48fe9baa3dc766814462bfadc436c2cc48b9a4c79ce54ca822daaa06b8f"
+    },
+    {
+      "path": "dist/codex/agents/forensic-accountant.md",
+      "sha256": "78fe788ff30a3d82a03229cc617f3cc6a3a3a98024bced182d2b464fa97f1570"
+    },
+    {
+      "path": "dist/codex/agents/fundamental-analyst.md",
+      "sha256": "57154bd93b116aa7fef0eb58f1408e474c13a9891eb9d6aa8b7aab6093a2b552"
+    },
+    {
+      "path": "dist/codex/agents/valuation-skeptic.md",
+      "sha256": "b09aad0c059d9bcd9bbe21f6355c7d51c4392c51880133cfb5a64e2c412bb40b"
+    },
+    {
+      "path": "dist/cursor/reference/audit.md",
+      "sha256": "f630dc26b4adadd9a29fa2d6e194cf035054bbe26d4fae7bd67e3cfbe71a7a7d"
+    },
+    {
+      "path": "dist/cursor/reference/challenge.md",
+      "sha256": "f845fe8400cd0ff577185878ea273d11fc766f5f21f99ada9ba6b4b2195675d5"
+    },
+    {
+      "path": "dist/cursor/reference/compare.md",
+      "sha256": "20eb4b31f083f31db0f0a439d230640db4520cc331b6c946b977f14734939094"
+    },
+    {
+      "path": "dist/cursor/reference/explain.md",
+      "sha256": "c8c48290b135fa89d3fa6ea02b92c3822d0d4c5297e32dfcd4c7b47dc39a23de"
+    },
+    {
+      "path": "dist/cursor/reference/init.md",
+      "sha256": "0b27d01197ed5ae2185af7e97013f8774803dda68ced1d5b83f9c77e2efc2167"
+    },
+    {
+      "path": "dist/cursor/reference/refresh.md",
+      "sha256": "c36aa8c4ee9cd9bf12537d5cba52690528f8ec689f6f41e63e47228d458853bd"
+    },
+    {
+      "path": "dist/cursor/reference/screen.md",
+      "sha256": "0b2f4607429ff1eb1677fb1cd404240c1114455e39355755d816dd291d2cd494"
+    },
+    {
+      "path": "dist/cursor/reference/stress.md",
+      "sha256": "dc66824957b68479694506db77d259059d0547fc5b655d72af6a7de8952fe91b"
+    },
+    {
+      "path": "dist/cursor/reference/track.md",
+      "sha256": "ffc903ad1c465f0f94ba7ca81522253def7a20490a3eeaaeb49a57ee54f9829e"
+    },
+    {
+      "path": "dist/cursor/reference/underwrite.md",
+      "sha256": "7be261f57aca4c7e4c9a4f2dab1164f2c3b2550f4f73d3ab041c0eecb38db91f"
+    },
+    {
+      "path": "dist/cursor/reference/shared/evidence-policy.md",
+      "sha256": "fc81c277350134c95dd9e4168a4d43f3994aa77b9af3a1321707576ed9c94522"
+    },
+    {
+      "path": "dist/cursor/reference/shared/failure-handling.md",
+      "sha256": "0bf580ab1c4c5376a22188a95353e5a2a6a0a710d5883dcc470f83d1887aa58b"
+    },
+    {
+      "path": "dist/cursor/reference/shared/response-style.md",
+      "sha256": "77d0f48fe9baa3dc766814462bfadc436c2cc48b9a4c79ce54ca822daaa06b8f"
+    },
+    {
+      "path": "dist/cursor/agents/forensic-accountant.md",
+      "sha256": "78fe788ff30a3d82a03229cc617f3cc6a3a3a98024bced182d2b464fa97f1570"
+    },
+    {
+      "path": "dist/cursor/agents/fundamental-analyst.md",
+      "sha256": "57154bd93b116aa7fef0eb58f1408e474c13a9891eb9d6aa8b7aab6093a2b552"
+    },
+    {
+      "path": "dist/cursor/agents/valuation-skeptic.md",
+      "sha256": "b09aad0c059d9bcd9bbe21f6355c7d51c4392c51880133cfb5a64e2c412bb40b"
+    },
+    {
+      "path": "dist/gemini/reference/audit.md",
+      "sha256": "f630dc26b4adadd9a29fa2d6e194cf035054bbe26d4fae7bd67e3cfbe71a7a7d"
+    },
+    {
+      "path": "dist/gemini/reference/challenge.md",
+      "sha256": "f845fe8400cd0ff577185878ea273d11fc766f5f21f99ada9ba6b4b2195675d5"
+    },
+    {
+      "path": "dist/gemini/reference/compare.md",
+      "sha256": "20eb4b31f083f31db0f0a439d230640db4520cc331b6c946b977f14734939094"
+    },
+    {
+      "path": "dist/gemini/reference/explain.md",
+      "sha256": "c8c48290b135fa89d3fa6ea02b92c3822d0d4c5297e32dfcd4c7b47dc39a23de"
+    },
+    {
+      "path": "dist/gemini/reference/init.md",
+      "sha256": "0b27d01197ed5ae2185af7e97013f8774803dda68ced1d5b83f9c77e2efc2167"
+    },
+    {
+      "path": "dist/gemini/reference/refresh.md",
+      "sha256": "c36aa8c4ee9cd9bf12537d5cba52690528f8ec689f6f41e63e47228d458853bd"
+    },
+    {
+      "path": "dist/gemini/reference/screen.md",
+      "sha256": "0b2f4607429ff1eb1677fb1cd404240c1114455e39355755d816dd291d2cd494"
+    },
+    {
+      "path": "dist/gemini/reference/stress.md",
+      "sha256": "dc66824957b68479694506db77d259059d0547fc5b655d72af6a7de8952fe91b"
+    },
+    {
+      "path": "dist/gemini/reference/track.md",
+      "sha256": "ffc903ad1c465f0f94ba7ca81522253def7a20490a3eeaaeb49a57ee54f9829e"
+    },
+    {
+      "path": "dist/gemini/reference/underwrite.md",
+      "sha256": "7be261f57aca4c7e4c9a4f2dab1164f2c3b2550f4f73d3ab041c0eecb38db91f"
+    },
+    {
+      "path": "dist/gemini/reference/shared/evidence-policy.md",
+      "sha256": "fc81c277350134c95dd9e4168a4d43f3994aa77b9af3a1321707576ed9c94522"
+    },
+    {
+      "path": "dist/gemini/reference/shared/failure-handling.md",
+      "sha256": "0bf580ab1c4c5376a22188a95353e5a2a6a0a710d5883dcc470f83d1887aa58b"
+    },
+    {
+      "path": "dist/gemini/reference/shared/response-style.md",
+      "sha256": "77d0f48fe9baa3dc766814462bfadc436c2cc48b9a4c79ce54ca822daaa06b8f"
+    },
+    {
+      "path": "dist/gemini/agents/forensic-accountant.md",
+      "sha256": "78fe788ff30a3d82a03229cc617f3cc6a3a3a98024bced182d2b464fa97f1570"
+    },
+    {
+      "path": "dist/gemini/agents/fundamental-analyst.md",
+      "sha256": "57154bd93b116aa7fef0eb58f1408e474c13a9891eb9d6aa8b7aab6093a2b552"
+    },
+    {
+      "path": "dist/gemini/agents/valuation-skeptic.md",
+      "sha256": "b09aad0c059d9bcd9bbe21f6355c7d51c4392c51880133cfb5a64e2c412bb40b"
+    },
+    {
+      "path": "dist/generic/reference/audit.md",
+      "sha256": "f630dc26b4adadd9a29fa2d6e194cf035054bbe26d4fae7bd67e3cfbe71a7a7d"
+    },
+    {
+      "path": "dist/generic/reference/challenge.md",
+      "sha256": "f845fe8400cd0ff577185878ea273d11fc766f5f21f99ada9ba6b4b2195675d5"
+    },
+    {
+      "path": "dist/generic/reference/compare.md",
+      "sha256": "20eb4b31f083f31db0f0a439d230640db4520cc331b6c946b977f14734939094"
+    },
+    {
+      "path": "dist/generic/reference/explain.md",
+      "sha256": "c8c48290b135fa89d3fa6ea02b92c3822d0d4c5297e32dfcd4c7b47dc39a23de"
+    },
+    {
+      "path": "dist/generic/reference/init.md",
+      "sha256": "0b27d01197ed5ae2185af7e97013f8774803dda68ced1d5b83f9c77e2efc2167"
+    },
+    {
+      "path": "dist/generic/reference/refresh.md",
+      "sha256": "c36aa8c4ee9cd9bf12537d5cba52690528f8ec689f6f41e63e47228d458853bd"
+    },
+    {
+      "path": "dist/generic/reference/screen.md",
+      "sha256": "0b2f4607429ff1eb1677fb1cd404240c1114455e39355755d816dd291d2cd494"
+    },
+    {
+      "path": "dist/generic/reference/stress.md",
+      "sha256": "dc66824957b68479694506db77d259059d0547fc5b655d72af6a7de8952fe91b"
+    },
+    {
+      "path": "dist/generic/reference/track.md",
+      "sha256": "ffc903ad1c465f0f94ba7ca81522253def7a20490a3eeaaeb49a57ee54f9829e"
+    },
+    {
+      "path": "dist/generic/reference/underwrite.md",
+      "sha256": "7be261f57aca4c7e4c9a4f2dab1164f2c3b2550f4f73d3ab041c0eecb38db91f"
+    },
+    {
+      "path": "dist/generic/reference/shared/evidence-policy.md",
+      "sha256": "fc81c277350134c95dd9e4168a4d43f3994aa77b9af3a1321707576ed9c94522"
+    },
+    {
+      "path": "dist/generic/reference/shared/failure-handling.md",
+      "sha256": "0bf580ab1c4c5376a22188a95353e5a2a6a0a710d5883dcc470f83d1887aa58b"
+    },
+    {
+      "path": "dist/generic/reference/shared/response-style.md",
+      "sha256": "77d0f48fe9baa3dc766814462bfadc436c2cc48b9a4c79ce54ca822daaa06b8f"
+    },
+    {
+      "path": "dist/generic/agents/forensic-accountant.md",
+      "sha256": "78fe788ff30a3d82a03229cc617f3cc6a3a3a98024bced182d2b464fa97f1570"
+    },
+    {
+      "path": "dist/generic/agents/fundamental-analyst.md",
+      "sha256": "57154bd93b116aa7fef0eb58f1408e474c13a9891eb9d6aa8b7aab6093a2b552"
+    },
+    {
+      "path": "dist/generic/agents/valuation-skeptic.md",
+      "sha256": "b09aad0c059d9bcd9bbe21f6355c7d51c4392c51880133cfb5a64e2c412bb40b"
+    },
+    {
+      "path": "dist/SHA256SUMS.v2",
+      "sha256": "5d94c164839db042184b47624b2f5cab6dc8e17f4b483546d4e570d008b83411"
+    }
+  ],
+  "name": "finance-skills-complete-distributions",
+  "spdxVersion": "SPDX-2.3"
+}

@@ -1,8 +1,8 @@
 import contextlib
 import io
 import sys
-import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -20,15 +20,15 @@ def _run(argv):
 class TestWatchlist(unittest.TestCase):
     def setUp(self):
         # Redirect persistence to a temp dir so tests never touch the real .cache.
-        self._tmp = tempfile.TemporaryDirectory()
-        d = Path(self._tmp.name)
+        self._tmp = Path("/tmp") / f"finance-skills-watchlist-{uuid.uuid4().hex}"
+        self._tmp.mkdir()
+        d = self._tmp
         self._orig_store, self._orig_cache = watchlist.STORE, watchlist.CACHE_DIR
         watchlist.STORE = d / "watchlists.json"
         watchlist.CACHE_DIR = d
 
     def tearDown(self):
         watchlist.STORE, watchlist.CACHE_DIR = self._orig_store, self._orig_cache
-        self._tmp.cleanup()
 
     def test_add_list_remove_roundtrip(self):
         _run(["add", "CRWV", "NBIS", "--name=neo"])

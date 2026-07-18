@@ -12,7 +12,7 @@ when_to_use: >
   Use primary filings separately for filing-specific or latest-event research;
   never present external figures as engine calculations.
 argument-hint: "[ask] <plain-English question or verb + ticker>"
-allowed-tools: Read, Grep, Glob, Bash(python3 *), Bash(python *)
+allowed-tools: Read, Grep, Glob, Bash(python3 -m finance_skills context *), Bash(python3 -m finance_skills screen *), Bash(python3 -m finance_skills underwrite *), Bash(python3 -m finance_skills audit *), Bash(python3 -m finance_skills compare *), Bash(python3 -m finance_skills stress *), Bash(python3 -m finance_skills snapshot *), Bash(python3 -m finance_skills diff *), Bash(python3 -m finance_skills explain *), Bash(python3 -m finance_skills doctor *)
 ---
 
 # finance-skills — agent contract (mandatory)

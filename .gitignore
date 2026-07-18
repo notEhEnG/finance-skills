@@ -17,6 +17,29 @@ venv/
 
 # Python build artifacts
 dist/
+!dist/
+dist/*
+!dist/claude/
+!dist/codex/
+!dist/cursor/
+!dist/gemini/
+!dist/generic/
+!dist/claude/SKILL.md
+!dist/codex/SKILL.md
+!dist/cursor/SKILL.md
+!dist/gemini/SKILL.md
+!dist/generic/SKILL.md
+!dist/claude/**
+!dist/codex/**
+!dist/cursor/**
+!dist/gemini/**
+!dist/generic/**
+!dist/SHA256SUMS
+!dist/sbom.json
+!dist/SHA256SUMS.v2
+!dist/sbom.v2.json
+!dist/0.14.0/
+!dist/0.14.0/**
 build/
 tmp/
 *.egg-info/

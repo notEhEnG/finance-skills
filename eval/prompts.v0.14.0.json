@@ -1,0 +1,50 @@
+[
+  {
+    "id": "mature-profitable",
+    "prompt": "Screen a mature profitable company and state what would change the conclusion."
+  },
+  {
+    "id": "hypergrowth-unprofitable",
+    "prompt": "Underwrite a hypergrowth unprofitable company without turning growth into a verdict."
+  },
+  {
+    "id": "capital-intensive-cloud",
+    "prompt": "Audit a capital-intensive cloud company for cash conversion and financing risk."
+  },
+  {
+    "id": "semiconductor",
+    "prompt": "Compare two semiconductor companies using aligned periods and currencies."
+  },
+  {
+    "id": "cyclical-industrial",
+    "prompt": "Challenge the thesis for a cyclical industrial company."
+  },
+  {
+    "id": "bank-insurer",
+    "prompt": "Screen a bank or insurer and preserve classification limitations."
+  },
+  {
+    "id": "missing-debt",
+    "prompt": "Analyze a company with missing debt data without treating missing as zero."
+  },
+  {
+    "id": "mismatched-currency",
+    "prompt": "Compare companies whose reported financials use different currencies."
+  },
+  {
+    "id": "provider-outage",
+    "prompt": "Respond to a provider outage without substituting fixture data."
+  },
+  {
+    "id": "fixture-only",
+    "prompt": "Use explicitly requested fixture data and disclose that mode prominently."
+  },
+  {
+    "id": "improving-tracked",
+    "prompt": "Refresh an improving tracked company and explain the material thesis effect."
+  },
+  {
+    "id": "thesis-breaking",
+    "prompt": "Refresh a tracked company whose new evidence breaks the saved thesis."
+  }
+]

@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/notEhEnG/finance-skills/evidence-report.schema.json",
+  "title": "Finance Skills Evidence Report",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "ticker",
+    "data_mode",
+    "observations",
+    "derived",
+    "warnings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "status": {
+      "enum": [
+        "success",
+        "partial",
+        "provider_error",
+        "period_mismatch",
+        "currency_mismatch",
+        "insufficient_data",
+        "unsupported_analysis",
+        "engine_error"
+      ]
+    },
+    "ticker": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9._-]{0,15}$"
+    },
+    "data_mode": {
+      "enum": [
+        "live",
+        "cached",
+        "fixture",
+        "user_assumption"
+      ]
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "estimate_observations": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "derived": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/derivedMetric"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "provider_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "provider",
+          "status"
+        ]
+      }
+    },
+    "reconciliation_conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "concept",
+          "status"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "observation": {
+      "type": "object",
+      "required": [
+        "value",
+        "concept",
+        "definition",
+        "unit",
+        "source_type",
+        "source_name",
+        "confidence",
+        "is_estimate",
+        "status"
+      ],
+      "properties": {
+        "value": {},
+        "concept": {
+          "type": "string"
+        },
+        "definition": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "period_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "period_start": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "period_end": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_type": {
+          "type": "string"
+        },
+        "source_name": {
+          "type": "string"
+        },
+        "source_reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "retrieved_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "primary",
+            "reconciled",
+            "secondary",
+            "estimated",
+            "conflicting",
+            "unusable"
+          ]
+        },
+        "is_estimate": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "derivedMetric": {
+      "type": "object",
+      "required": [
+        "value",
+        "concept",
+        "formula",
+        "inputs",
+        "period_alignment",
+        "currency_alignment",
+        "calculation_version",
+        "status"
+      ]
+    },
+    "finding": {
+      "type": "object",
+      "required": [
+        "rule_id",
+        "category",
+        "title",
+        "severity",
+        "confidence",
+        "status",
+        "evidence_paths",
+        "explanation",
+        "possible_benign_explanations",
+        "remediation"
+      ]
+    }
+  }
+}

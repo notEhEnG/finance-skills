@@ -1,0 +1,30 @@
+{
+  "files": [
+    {
+      "path": "dist/claude/SKILL.md",
+      "sha256": "d72ec94b2cfb4d5112f681b015f354b9238f2b07ffeed07b20c2b160116ca05e"
+    },
+    {
+      "path": "dist/codex/SKILL.md",
+      "sha256": "2a1e6316cb001eb0b56d5cafd4ec15a694312d022838759d0b4ca2aaf9c71baa"
+    },
+    {
+      "path": "dist/cursor/SKILL.md",
+      "sha256": "8ca5c271f77f21a838ea4bf2c6467a91c3a91ff8522ad51be6628f788b1df425"
+    },
+    {
+      "path": "dist/gemini/SKILL.md",
+      "sha256": "537d83d9ef5b6e28e7d97184f0c8adeeb7ab4ece0200276ac323702dc8ed3f86"
+    },
+    {
+      "path": "dist/generic/SKILL.md",
+      "sha256": "23c1f48b16926170fd2187a66e7b016242ff72eeddddedcf043b326455085e37"
+    },
+    {
+      "path": "dist/SHA256SUMS",
+      "sha256": "1935088f892236fd3cb2444586e5dca7316894746bcfb91e640b0b8ee79f9f3e"
+    }
+  ],
+  "name": "finance-skills-distributions",
+  "spdxVersion": "SPDX-2.3"
+}
