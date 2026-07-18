@@ -120,6 +120,15 @@ class TestReadOnlyArchitecture(unittest.TestCase):
         for prohibited in ("rm -", "-delete", "--delete", "cp -f", "cp -R", "cp -r"):
             self.assertNotIn(prohibited, installer, prohibited)
 
+    def test_release_version_and_installer_pin_stay_aligned(self):
+        expected = "0.14.1"
+        pyproject = (SCRIPTS.parent / "pyproject.toml").read_text("utf-8")
+        package = (SCRIPTS / "__init__.py").read_text("utf-8")
+        installer = (SCRIPTS.parent / "install.sh").read_text("utf-8")
+        self.assertIn(f'version = "{expected}"', pyproject)
+        self.assertIn(f'__version__ = "{expected}"', package)
+        self.assertIn(f'REPO_REF="${{FINANCE_SKILLS_REF:-v{expected}}}"', installer)
+
 
 if __name__ == "__main__":
     unittest.main()

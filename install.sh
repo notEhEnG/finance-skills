@@ -7,7 +7,7 @@
 #   ./install.sh [claude|antigravity|codex|cursor|gemini|all] [--dir TARGET_PROJECT]
 #
 # Run from a clone, or pipe from GitHub:
-#   curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/v0.14.0/install.sh | bash -s -- claude
+#   curl -fsSL https://raw.githubusercontent.com/notEhEnG/finance-skills/v0.14.1/install.sh | bash -s -- claude
 #
 # It copies the skill (SKILL.md + scripts + references) into the tool's skill
 # directory under the target project, so /finance-skills can run the engine.
@@ -15,7 +15,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/notEhEnG/finance-skills.git"
-REPO_REF="${FINANCE_SKILLS_REF:-v0.13.0}"
+REPO_REF="${FINANCE_SKILLS_REF:-v0.14.1}"
 TOOL="claude"
 TARGET_DIR="$PWD"
 
